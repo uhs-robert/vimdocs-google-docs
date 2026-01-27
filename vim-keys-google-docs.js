@@ -28,42 +28,22 @@
     // It receives requests from the content script to simulate keypresses.
 
     const simulateKeyEvent = function (eventType, el, args) {
-      const event = document.createEvent("KeyboardEvent");
-      Object.defineProperty(event, "keyCode", {
-        get() {
-          return this.keyCodeVal;
-        },
-      });
-      Object.defineProperty(event, "which", {
-        get() {
-          return this.keyCodeVal;
-        },
-      });
       const mods = args.mods || {};
-      event.initKeyboardEvent(
-        eventType, // eventName
-        true, // canBubble
-        true, // canceleable
-        document.defaultView, // view
-        "", // keyIdentifier string
-        false, // (not sure)
-        !!mods.control, // control
-        !!mods.alt, // alt
-        !!mods.shift, // shift
-        !!mods.meta, // meta
-        args.keyCode, // keyCode
-        args.keyCode, // (not sure)
-      );
-      event.keyCodeVal = args.keyCode;
-      Object.defineProperty(event, "altKey", {
-        get() {
-          return !!mods.alt;
-        },
+      const event = new KeyboardEvent(eventType, {
+        bubbles: true,
+        cancelable: true,
+        view: document.defaultView,
+        keyCode: args.keyCode,
+        which: args.keyCode,
+        shiftKey: !!mods.shift,
+        ctrlKey: !!mods.control,
+        altKey: !!mods.alt,
+        metaKey: !!mods.meta,
       });
-      Object.defineProperty(event, "metaKey", {
-        get() {
-          return !!mods.meta;
-        },
+      // Override keyCode/which since KeyboardEvent constructor doesn't set them reliably
+      Object.defineProperties(event, {
+        keyCode: { value: args.keyCode },
+        which: { value: args.keyCode },
       });
       el.dispatchEvent(event);
     };
@@ -790,24 +770,22 @@
     function simulateClick(el, x = 0, y = 0) {
       const eventSequence = ["mouseover", "mousedown", "mouseup", "click"];
       for (const eventName of eventSequence) {
-        const event = document.createEvent("MouseEvents");
-        event.initMouseEvent(
-          eventName,
-          true,
-          true,
-          window,
-          1,
-          x,
-          y,
-          x,
-          y,
-          false,
-          false,
-          false,
-          false,
-          0,
-          null,
-        );
+        const event = new MouseEvent(eventName, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          detail: 1,
+          screenX: x,
+          screenY: y,
+          clientX: x,
+          clientY: y,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+          metaKey: false,
+          button: 0,
+          relatedTarget: null,
+        });
         el.dispatchEvent(event);
       }
     }
