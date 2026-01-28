@@ -36,6 +36,21 @@
 
   /*
    * ======================================================================================
+   * GOOGLE DOCS ELEMENTS
+   * Update DOM elements here. If something isn't working, start here.
+   * ======================================================================================
+   */
+  const GoogleDocs = {
+    getCursor: () => {
+      return document.getElementById("kix-current-user-cursor-caret") || null;
+    },
+    getFindWindow: () => {
+      return document.getElementById("docs-findbar-id") || null;
+    },
+  };
+
+  /*
+   * ======================================================================================
    * PART 1: INJECTED PAGE SCRIPT
    * This logic runs in the main page context to simulate keystrokes on the Docs iframe.
    * ======================================================================================
@@ -257,7 +272,7 @@
 
       replaceCharMode = false;
 
-      const cursor = getCursorTop();
+      const cursor = GoogleDocs.getCursor();
       if (cursor) {
         cursor.style.opacity = 1;
         cursor.style.display = "block";
@@ -280,8 +295,11 @@
     function switchModeToInsert() {
       mode = "insert";
       updateModeIndicator(mode);
-      const cursor = getCursorTop();
-      if (cursor) cursor.style.opacity = 0;
+      const cursor = GoogleDocs.getCursor();
+      if (cursor) {
+        const parent = cursor.parentElement;
+        if (parent) parent.classList.add("vim-no-cursor-animation");
+      }
     }
 
     let longStringOp = "";
@@ -341,7 +359,7 @@
       switchModeToInsert();
     }
     function handleAppend() {
-      const cursor = getCursorTop();
+      const cursor = GoogleDocs.getCursor();
       if (!cursor) {
         sendKeyEvent("right");
         switchModeToInsert();
