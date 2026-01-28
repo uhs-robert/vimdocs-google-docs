@@ -1040,6 +1040,7 @@
 
       if (Mode.current != "insert") {
         e.preventDefault();
+        e.stopPropagation();
         switch (Mode.current) {
           case "normal":
             handleKeyEventNormal(e.key);
