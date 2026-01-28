@@ -1504,6 +1504,9 @@
         case "Enter":
           if (STATE.search.active) closeFindWindow();
           return;
+        case "Backspace":
+          sendKeyEvent("left");
+          break;
         default:
           return;
       }
