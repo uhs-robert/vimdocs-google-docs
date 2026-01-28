@@ -55,10 +55,31 @@
    * This logic runs in the main page context to simulate keystrokes on the Docs iframe.
    * ======================================================================================
    */
-  function pageContextScript() {
-    // This script gets inserted into the page.
-    // It receives requests from the content script to simulate keypresses.
+  function getPageContextScript() {
+    /**
+     * Gets the active editor element from the Google Docs iframe.
+     * @returns {Element|null} The active element inside the editor iframe, or null if not found.
+     */
+    function getEditor() {
+      const iframe = document.querySelector(".docs-texteventtarget-iframe");
+      if (iframe && iframe.contentDocument) {
+        return iframe.contentDocument.activeElement;
+      }
+      return null;
+    }
 
+    /**
+     * Simulates a keyboard event on a DOM element.
+     * @param {string} eventType - The type of keyboard event (e.g., "keydown", "keyup").
+     * @param {Element} el - The DOM element to dispatch the event on.
+     * @param {Object} args - Event arguments.
+     * @param {number} args.keyCode - The key code for the event.
+     * @param {Object} [args.mods] - Modifier key states.
+     * @param {boolean} [args.mods.shift] - Whether Shift is pressed.
+     * @param {boolean} [args.mods.control] - Whether Control is pressed.
+     * @param {boolean} [args.mods.alt] - Whether Alt is pressed.
+     * @param {boolean} [args.mods.meta] - Whether Meta is pressed.
+     */
     const simulateKeyEvent = function (eventType, el, args) {
       const mods = args.mods || {};
       const event = new KeyboardEvent(eventType, {
@@ -79,30 +100,27 @@
       });
       el.dispatchEvent(event);
     };
-
-    // Helper to get the editor element dynamically
-    function getEditorElement() {
-      const iframe = document.querySelector(".docs-texteventtarget-iframe");
-      if (iframe && iframe.contentDocument) {
-        return iframe.contentDocument.activeElement;
-      }
-      return null;
-    }
-
+    /**
+     * Listens for custom keypress simulation events dispatched from the content script.
+     * Simulates both keydown and keyup events on the editor element.
+     * @listens doc-keys-simulate-keypress
+     * @param {CustomEvent} event - The custom event containing keypress details.
+     * @param {Object} event.detail - The event arguments passed to simulateKeyEvent.
+     */
     window.addEventListener("doc-keys-simulate-keypress", function (event) {
       const args = event.detail;
-      const editorEl = getEditorElement();
-      if (editorEl) {
-        simulateKeyEvent("keydown", editorEl, args);
-        simulateKeyEvent("keyup", editorEl, args);
+      const editor_el = getEditor();
+      if (editor_el) {
+        simulateKeyEvent("keydown", editor_el, args);
+        simulateKeyEvent("keyup", editor_el, args);
       }
     });
   }
 
   // Inject the page script
-  const scriptElement = document.createElement("script");
-  scriptElement.textContent = "(" + pageContextScript.toString() + ")();";
-  document.documentElement.appendChild(scriptElement);
+  const script_el = document.createElement("script");
+  script_el.textContent = "(" + getPageContextScript.toString() + ")();";
+  document.documentElement.appendChild(script_el);
 
   /*
    * ======================================================================================
