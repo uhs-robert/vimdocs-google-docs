@@ -16,7 +16,6 @@
 
 // TODO: Add more `:` commands (e.g., :q, :run (open alt+/), :$s/text/replace/gc etc.)
 // TODO: `g` to trigger go options: gg=to top, gf=follow link (), gm=open menu (alt+/), gu=lowercase, gU=uppercase g[=previousTab, g]=nextTab, gh=showHelp)
-// TODO: `.` is repeat last action (ctrl+y)
 
 /** TODO:
  * Good candidates for modularization:
@@ -1453,6 +1452,10 @@
           return;
         case "x":
           sendKeyEvent("delete");
+          break;
+        case ".":
+          // Repeat last action (redo)
+          sendKeyEvent("y", { control: true });
           break;
         case ">":
           Mode.current = "waitForIndent";
