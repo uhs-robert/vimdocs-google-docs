@@ -14,6 +14,29 @@
 // @updateURL https://update.greasyfork.org/scripts/562026/VimDocs%20%28Vim%20for%20Google%20Docs%29.meta.js
 // ==/UserScript==
 
+// TODO: Add `:` commands with a little window next to indicator that shows the active command.
+
+/** TODO:
+ * Good candidates for modularization:
+  Object: Keys
+  What it would contain: keyCodes, sendKeyEvent(), modifier helpers (wordMods, paragraphMods, clipboardMods)
+
+  Object: Move
+  What it would contain: goToStartOfLine, goToEndOfLine, goToStartOfWord, goToEndOfWord, goToStartOfPara, goToEndOfPara, goToTop
+
+  Object: Select
+  What it would contain: selectToStartOfLine, selectToEndOfLine, selectToStartOfWord, selectToEndOfWord, selectToEndOfPara, selectInnerWord
+
+  Object: Find
+  What it would contain: STATE.search.*, handleFindChar, handleSlashSearch, handleStarSearch, closeFindWindow, hideFindWindowAndRefocus
+
+  Object: Operator
+  What it would contain: STATE.longStringOp, runLongStringOp, waitForFirstInput, waitForSecondInput, waitForTextObject, waitForVisualInput
+
+  Object: Menu
+  What it would contain: menuItems, menuItemElements, clickMenu, getMenuItem,findMenuItem, activateTopLevelMenu, simulateClick
+ * */
+
 (function () {
   "use strict";
 
@@ -161,10 +184,13 @@
       down: 40,
       delete: 46,
       f: 70,
+      g: 71,
+      v: 86,
     };
 
     const wordModifierKey = isMac ? "alt" : "control";
     const paragraphModifierKey = isMac ? "alt" : "control";
+    const clipboardModifierKey = isMac ? "meta" : "control";
 
     /**
      * Returns modifier keys for word-based navigation.
@@ -184,6 +210,12 @@
       return { shift, [paragraphModifierKey]: true };
     }
 
+    /**
+     * Returns modifier keys for clipboard operations (copy/paste).
+     * @returns {Object} Modifier key object for clipboard operations.
+     */
+    function clipboardMods() {
+      return { [clipboardModifierKey]: true };
     }
 
     /**
@@ -528,6 +560,7 @@
           break;
         case "p":
           sendKeyEvent("v", clipboardMods());
+          // sendKeyEvent("v", clipboardMods());
           Mode.toNormal(true);
           break;
         case "v":
@@ -961,6 +994,7 @@
           break;
         case "p":
           clickMenu(menuItems.paste);
+          // sendKeyEvent("v", clipboardMods());
           break;
         case "a":
           handleAppend();
@@ -1102,6 +1136,7 @@
           break;
         case "p":
           clickMenu(menuItems.paste);
+          // sendKeyEvent("v", clipboardMods());
           Mode.toNormal(true);
           break;
         case "}":
