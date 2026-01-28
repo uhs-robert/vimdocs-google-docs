@@ -1357,16 +1357,24 @@
         case "h":
           // Go to next heading (Ctrl+Alt+N, then Ctrl+Alt+H)
           sendKeyEvent("n", { control: true, alt: true });
-          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 50);
+          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 10);
           break;
         case "H":
           // Go to previous heading (Ctrl+Alt+P, then Ctrl+Alt+H)
           sendKeyEvent("p", { control: true, alt: true });
-          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 50);
+          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 10);
           break;
         case "?":
           // Show help
           Command.showHelp();
+          break;
+        case "T":
+          // Go to previous tab (Ctrl+Shift+PgUp)
+          sendKeyEvent("pageup", { control: true, shift: true });
+          break;
+        case "t":
+          // Go to next tab (Ctrl+Shift+PgDown)
+          sendKeyEvent("pagedown", { control: true, shift: true });
           break;
       }
       Mode.toNormal();
@@ -1464,7 +1472,15 @@
         case "a":
           handleAppend();
           break;
+        case "A":
+          goToEndOfLine();
+          Mode.toInsert();
+          break;
         case "i":
+          Mode.toInsert();
+          break;
+        case "I":
+          goToStartOfLine();
           Mode.toInsert();
           break;
         case "^":
@@ -1475,18 +1491,14 @@
         case "$":
           goToEndOfLine();
           break;
-        case "I":
-          goToStartOfLine();
-          Mode.toInsert();
-          break;
-        case "A":
-          goToEndOfLine();
-          Mode.toInsert();
-          break;
         case "C":
           selectToEndOfLine();
           clickMenu(menuItems.cut);
           Mode.toInsert();
+          break;
+        case "D":
+          selectToEndOfLine();
+          clickMenu(menuItems.cut);
           break;
         case "v":
           Mode.toVisual();
