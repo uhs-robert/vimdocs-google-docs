@@ -1372,12 +1372,15 @@
           goToStartOfPara();
           break;
         case "b":
+        case "B":
           goToStartOfWord();
           break;
         case "e":
+        case "E":
           goToEndOfWord();
           break;
         case "w":
+        case "W":
           goToEndOfWord();
           goToEndOfWord();
           goToStartOfWord();
@@ -1395,7 +1398,7 @@
           Mode.current = "waitForFirstInput";
           break;
         case "p":
-          // sendKeyEvent("v", clipboardMods());
+          //FIX: sendKeyEvent("v", clipboardMods());
           break;
         case "a":
           handleAppend();
@@ -1555,7 +1558,7 @@
           sendKeyEvent("right", { shift: true });
           break;
         case "p":
-          // sendKeyEvent("v", clipboardMods());
+          //FIX: sendKeyEvent("v", clipboardMods());
           Mode.toNormal(true);
           break;
         case "}":
