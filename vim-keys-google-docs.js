@@ -172,6 +172,7 @@
       right: 39,
       down: 40,
       delete: 46,
+      f: 70,
     };
 
     const wordModifierKey = isMac ? "alt" : "control";
@@ -609,7 +610,64 @@
           case "multipleMotion":
             handleMultipleMotion(e.key);
             break;
+          case "waitForFindChar":
+            handleFindChar(e.key);
+            break;
         }
+      }
+    }
+
+    function hideFindWindowAndRefocus(editorActiveEl) {
+      const findWindow = GoogleDocs.getFindWindow();
+      if (findWindow) findWindow.style.display = "none";
+
+      setTimeout(() => {
+        if (editorActiveEl && typeof editorActiveEl.focus === "function") {
+          editorActiveEl.focus();
+        }
+        switchModeToNormal();
+      }, 50);
+    }
+
+    function handleFindChar(key) {
+      const editorActiveEl = iframe.contentDocument?.activeElement;
+      sendKeyEvent("f", { control: true });
+
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.tagName === "INPUT") {
+          activeEl.value = key;
+          activeEl.dispatchEvent(new Event("input", { bubbles: true }));
+          hideFindWindowAndRefocus(editorActiveEl);
+        }
+      }, 100);
+
+      STATE.search.active = true;
+      STATE.search.isCharSearch = true;
+      STATE.mode = "normal";
+    }
+
+    function closeFindWindow() {
+      const find_window = GoogleDocs.getFindWindow();
+      if (find_window && find_window.style.display === "none") {
+        find_window.style.display = "block";
+        // Find the input inside the find bar and dispatch Escape on it
+        const find_input = find_window.querySelector("input");
+        if (find_input) {
+          find_input.focus();
+          const escEvent = new KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            key: "Escape",
+            code: "Escape",
+            keyCode: 27,
+            which: 27,
+          });
+          find_input.dispatchEvent(escEvent);
+        }
+        STATE.search.active = false;
+        STATE.search.forward = true;
+        STATE.search.isCharSearch = false;
       }
     }
 
@@ -619,6 +677,17 @@
         STATE.multipleMotion.mode = "normal";
         STATE.multipleMotion.times = Number(key);
         return;
+      }
+
+      // Cancel search if key isn't the cycling key for that search type
+      if (STATE.search.active) {
+        const isCharCycleKey =
+          STATE.search.isCharSearch && (key === "f" || key === "F");
+        const isSlashCycleKey =
+          !STATE.search.isCharSearch && (key === "n" || key === "N");
+        if (!isCharCycleKey && !isSlashCycleKey) {
+          closeFindWindow();
+        }
       }
 
       switch (key) {
@@ -705,12 +774,31 @@
           switchModeToInsert();
           break;
 
+        case "f":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          } else {
+            STATE.search.forward = true;
+            STATE.mode = "waitForFindChar";
+          }
+          return;
+        case "F":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: STATE.search.forward });
+          } else {
+            STATE.search.forward = false;
+            STATE.mode = "waitForFindChar";
+          }
+          return;
         case "/":
           clickMenu(menuItems.find);
           break;
         case "x":
           sendKeyEvent("delete");
           break;
+        case "Enter":
+          if (STATE.search.active) closeFindWindow();
+          return;
         default:
           return;
       }
