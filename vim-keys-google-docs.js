@@ -403,62 +403,92 @@
       longStringOp: "",
     };
 
+    /**
+     * Repeats a motion function multiple times.
+     * @param {Function} motion - The motion handler function to repeat.
+     * @param {number} times - Number of times to repeat.
+     * @param {string} key - The key to pass to the motion handler.
+     */
+    function repeatMotion(motion, times, key) {
+      for (let i = 0; i < times; i++) motion(key);
     }
 
+    /** Moves cursor to start of current line (vim `0`, `^`, `_`). */
     function goToStartOfLine() {
       sendKeyEvent("home");
     }
+    /** Moves cursor to end of current line (vim `$`). */
     function goToEndOfLine() {
       sendKeyEvent("end");
     }
+    /** Selects from cursor to start of line. */
     function selectToStartOfLine() {
       sendKeyEvent("home", { shift: true });
     }
+    /** Selects from cursor to end of line. */
     function selectToEndOfLine() {
       sendKeyEvent("end", { shift: true });
     }
+    /** Selects from cursor to start of previous word (vim `b` in visual). */
     function selectToStartOfWord() {
       sendKeyEvent("left", wordMods(true));
     }
+    /** Selects from cursor to end of current word (vim `e`/`w` in visual). */
     function selectToEndOfWord() {
       sendKeyEvent("right", wordMods(true));
     }
+    /** Moves cursor to end of current word (vim `e`). */
     function goToEndOfWord() {
       sendKeyEvent("right", wordMods());
     }
+    /** Moves cursor to start of previous word (vim `b`). */
     function goToStartOfWord() {
       sendKeyEvent("left", wordMods());
     }
+    /** Selects the word under cursor (vim `iw` text object). */
     function selectInnerWord() {
       sendKeyEvent("left");
       sendKeyEvent("left", wordMods());
       sendKeyEvent("right", wordMods(true));
     }
+    /** Moves cursor to top of document (vim `gg`). */
     function goToTop() {
       sendKeyEvent("home", { control: true, shift: true });
       STATE.longStringOp = "";
     }
+    /** Selects from cursor to end of paragraph. */
     function selectToEndOfPara() {
       sendKeyEvent("down", paragraphMods(true));
     }
+    /**
+     * Moves cursor to end of paragraph.
+     * @param {boolean} [shift=false] - Whether to select while moving.
+     */
     function goToEndOfPara(shift = false) {
       sendKeyEvent("down", paragraphMods(shift));
       sendKeyEvent("right", { shift });
     }
+    /**
+     * Moves cursor to start of paragraph.
+     * @param {boolean} [shift=false] - Whether to select while moving.
+     */
     function goToStartOfPara(shift = false) {
       sendKeyEvent("up", paragraphMods(shift));
     }
+    /** Opens a new line above cursor and enters insert mode (vim `O`). */
     function addLineTop() {
       goToStartOfLine();
       sendKeyEvent("enter");
       sendKeyEvent("up");
       Mode.toInsert();
     }
+    /** Opens a new line below cursor and enters insert mode (vim `o`). */
     function addLineBottom() {
       goToEndOfLine();
       sendKeyEvent("enter");
       Mode.toInsert();
     }
+    /** Moves cursor right and enters insert mode, handling line wrap (vim `a`). */
     function handleAppend() {
       const cursor = GoogleDocs.getCursor();
       if (!cursor) {
@@ -477,6 +507,10 @@
         });
       });
     }
+    /**
+     * Executes the pending operator (c, d, y, p, g) on the current selection.
+     * @param {string} [operation=STATE.longStringOp] - The operator to execute.
+     */
     function runLongStringOp(operation = STATE.longStringOp) {
       switch (operation) {
         case "c":
@@ -504,6 +538,10 @@
       }
     }
 
+    /**
+     * Handles the second input for compound motions (e.g., `daw` needs `a` then `w`).
+     * @param {string} key - The key pressed.
+     */
     function waitForSecondInput(key) {
       switch (key) {
         case "w":
@@ -520,6 +558,10 @@
       }
     }
 
+    /**
+     * Handles text object selection after `i` or `a` (e.g., `ciw`, `daw`).
+     * @param {string} key - The text object key (w for word, etc.).
+     */
     function waitForTextObject(key) {
       switch (key) {
         case "w":
@@ -532,6 +574,10 @@
       }
     }
 
+    /**
+     * Handles the first motion/text-object input after an operator (c, d, y).
+     * @param {string} key - The motion or text-object key.
+     */
     function waitForFirstInput(key) {
       switch (key) {
         case "i":
@@ -568,6 +614,10 @@
       }
     }
 
+    /**
+     * Handles text object selection in visual mode (e.g., `viw`, `vap`).
+     * @param {string} key - The text object key.
+     */
     function waitForVisualInput(key) {
       switch (key) {
         case "w":
@@ -583,6 +633,10 @@
       Mode.current = "v-line";
     }
 
+    /**
+     * Handles count prefix for motions (e.g., `5j` moves down 5 lines).
+     * @param {string} key - The next key after the count digits.
+     */
     function handleMultipleMotion(key) {
       if (/[0-9]/.test(key)) {
         STATE.multipleMotion.times = Number(
@@ -606,6 +660,10 @@
       Mode.current = STATE.multipleMotion.mode;
     }
 
+    /**
+     * Main keyboard event handler. Routes keys to appropriate mode handlers.
+     * @param {KeyboardEvent} e - The keyboard event from the editor iframe.
+     */
     function eventHandler(e) {
       if (["Shift", "Meta", "Control", "Alt", ""].includes(e.key)) return;
 
@@ -697,6 +755,10 @@
       }
     }
 
+    /**
+     * Hides the Google Docs find bar and refocuses the editor.
+     * @param {Element} editorActiveEl - The editor element to refocus.
+     */
     function hideFindWindowAndRefocus(editorActiveEl) {
       const findWindow = GoogleDocs.getFindWindow();
       if (findWindow) findWindow.style.display = "none";
@@ -709,6 +771,10 @@
       }, 50);
     }
 
+    /**
+     * Handles vim `f` and `F` single-character search.
+     * @param {string} key - The character to search for.
+     */
     function handleFindChar(key) {
       const editorActiveEl = iframe.contentDocument?.activeElement;
       sendKeyEvent("f", { control: true });
@@ -768,6 +834,7 @@
       }, 100);
     }
 
+    /** Closes the Google Docs find bar and resets search state. */
     function closeFindWindow() {
       const find_window = GoogleDocs.getFindWindow();
       if (find_window && find_window.style.display === "none") {
@@ -792,6 +859,10 @@
       }
     }
 
+    /**
+     * Handles key events in normal mode.
+     * @param {string} key - The key pressed.
+     */
     function handleKeyEventNormal(key) {
       if (/[1-9]/.test(key)) {
         Mode.current = "multipleMotion";
@@ -953,6 +1024,10 @@
       }
     }
 
+    /**
+     * Handles key events in visual and visual-line modes.
+     * @param {string} key - The key pressed.
+     */
     function handleKeyEventVisualLine(key) {
       if (/[1-9]/.test(key)) {
         Mode.current = "multipleMotion";
@@ -1032,11 +1107,21 @@
       find: { parent: "Edit", caption: "Find" },
     };
 
+    /**
+     * Clicks a Google Docs menu item by its definition.
+     * @param {Object} itemCaption - Menu item definition with parent and caption.
+     */
     function clickMenu(itemCaption) {
       const item = getMenuItem(itemCaption);
       if (item) simulateClick(item);
     }
 
+    /**
+     * Gets a cached menu item element or finds and caches it.
+     * @param {Object} menuItem - Menu item definition with parent and caption.
+     * @param {boolean} [silenceWarning=false] - Suppress console warning if not found.
+     * @returns {Element|null} The menu item element or null if not found.
+     */
     function getMenuItem(menuItem, silenceWarning = false) {
       const caption = menuItem.caption;
       let el = menuItemElements[caption];
@@ -1050,6 +1135,11 @@
       return (menuItemElements[caption] = el);
     }
 
+    /**
+     * Finds a menu item element by activating its parent menu and searching.
+     * @param {Object} menuItem - Menu item definition with parent and caption.
+     * @returns {Element|null} The menu item element or null if not found.
+     */
     function findMenuItem(menuItem) {
       activateTopLevelMenu(menuItem.parent);
       const menuItemEls = document.querySelectorAll(".goog-menuitem");
@@ -1067,6 +1157,12 @@
       return null;
     }
 
+    /**
+     * Simulates a full mouse click sequence on an element.
+     * @param {Element} el - The element to click.
+     * @param {number} [x=0] - X coordinate for the click.
+     * @param {number} [y=0] - Y coordinate for the click.
+     */
     function simulateClick(el, x = 0, y = 0) {
       const eventSequence = ["mouseover", "mousedown", "mouseup", "click"];
       for (const eventName of eventSequence) {
@@ -1090,6 +1186,10 @@
       }
     }
 
+    /**
+     * Activates a top-level menu in Google Docs (File, Edit, etc.).
+     * @param {string} menuCaption - The menu name to activate.
+     */
     function activateTopLevelMenu(menuCaption) {
       const buttons = Array.from(document.querySelectorAll(".menu-button"));
       const button = buttons.find((el) => el.innerText.trim() === menuCaption);
