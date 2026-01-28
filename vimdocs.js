@@ -1313,6 +1313,7 @@
           sendKeyEvent("enter", { alt: true });
           break;
         case "m":
+        case "/":
           // Open menu search (Alt + /)
           sendKeyEvent("slash", { alt: true });
           break;
