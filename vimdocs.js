@@ -14,7 +14,11 @@
 // @updateURL https://update.greasyfork.org/scripts/562026/VimDocs%20%28Vim%20for%20Google%20Docs%29.meta.js
 // ==/UserScript==
 
-// TODO: Add `:` commands with a little window next to indicator that shows the active command.
+// TODO: Add more `:` commands (e.g., :q, :run (open alt+/), :$s/text/replace/gc etc.)
+// TODO: `>` and `<` to Ctrl+[ and Ctrl+] respectively for paragraph indentation
+// TODO: `z` to trigger zoom options: (- for zoomout, = for zoomin, z for 100%)
+// TODO: `g` to trigger go options: gg=to top, gf=follow link (), gm=open menu (alt+/), gu=lowercase, gU=uppercase g[=previousTab, g]=nextTab, gh=showHelp)
+// TODO: `.` is repeat last action (ctrl+y)
 
 /** TODO:
  * Good candidates for modularization:
@@ -471,9 +475,214 @@
       },
     };
 
+    /*
+     * ======================================================================================
+     * COMMAND MODE
+     * Handles vim-style : commands.
+     * ======================================================================================
+     */
+    const Command = {
+      container: null,
+      input: null,
+
+      /**
+       * Available commands registry.
+       * Each command has a name and an execute function.
+       */
+      commands: {
+        help: {
+          description: "Show available commands",
+          execute: () => {
+            Command.showHelp();
+          },
+        },
+      },
+
+      /**
+       * Initializes the command input elements.
+       */
+      init() {
+        this.container = document.createElement("div");
+        this.container.id = "vim-command-input";
+        this.container.style.display = "none";
+
+        this.input = document.createElement("input");
+        this.input.type = "text";
+        this.input.style.padding = "6px 12px";
+        this.input.style.borderRadius = "4px";
+        this.input.style.border = "2px solid " + COLORSCHEME.mode.normal.bg;
+        this.input.style.boxSizing = "border-box";
+        this.input.style.height = "36px";
+        this.input.style.fontFamily = "monospace";
+        this.input.style.fontSize = "14px";
+        this.input.style.width = "200px";
+        this.input.style.outline = "none";
+        this.input.style.backgroundColor = "#1a1a1a";
+        this.input.style.color = "white";
+        this.input.placeholder = ":";
+
+        this.container.appendChild(this.input);
+        StatusLine.container.appendChild(this.container);
+      },
+
+      /**
+       * Shows the help panel with available commands.
+       */
+      showHelp() {
+        let helpEl = document.getElementById("vim-command-help");
+        if (!helpEl) {
+          helpEl = document.createElement("div");
+          helpEl.id = "vim-command-help";
+          helpEl.tabIndex = -1;
+          helpEl.style.position = "fixed";
+          helpEl.style.top = "50%";
+          helpEl.style.left = "50%";
+          helpEl.style.transform = "translate(-50%, -50%)";
+          helpEl.style.padding = "24px";
+          helpEl.style.borderRadius = "8px";
+          helpEl.style.fontFamily = "monospace";
+          helpEl.style.fontSize = "14px";
+          helpEl.style.backgroundColor = "#1a1a1a";
+          helpEl.style.color = "white";
+          helpEl.style.zIndex = "10000";
+          helpEl.style.minWidth = "300px";
+          helpEl.style.boxShadow = "0 4px 20px rgba(0,0,0,0.5)";
+          helpEl.style.border = "1px solid #333";
+          helpEl.style.outline = "none";
+          document.body.appendChild(helpEl);
+        }
+
+        // Build help content
+        const cmdList = Object.entries(this.commands)
+          .map(([name, cmd]) => `  :${name.padEnd(12)} ${cmd.description}`)
+          .join("\n");
+
+        helpEl.innerHTML = `
+          <div style="margin-bottom: 16px; font-size: 16px; font-weight: bold; color: ${COLORSCHEME.mode.normal.bg};">
+            VimDocs Commands
+          </div>
+          <pre style="margin: 0; color: #ccc;">${cmdList}</pre>
+          <div style="margin-top: 16px; color: #666; font-size: 12px;">
+            Press Escape or Enter to close
+          </div>
+        `;
+        helpEl.style.display = "block";
+        helpEl.focus();
+
+        // Close on Escape or Enter
+        const closeHelp = (e) => {
+          if (e.key === "Escape" || e.key === "Enter") {
+            e.preventDefault();
+            helpEl.style.display = "none";
+            helpEl.removeEventListener("keydown", closeHelp);
+            GoogleDocs.restoreFocus(() => Mode.toNormal());
+          }
+        };
+        helpEl.addEventListener("keydown", closeHelp);
+      },
+
+      /**
+       * Opens the command input and focuses it.
+       */
+      open() {
+        GoogleDocs.saveActiveElement();
+
+        this.container.style.display = "block";
+        this.input.value = "";
+        this.input.focus();
+
+        // Set up event listeners
+        this._handleKeydown = (e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            this.close();
+            GoogleDocs.restoreFocus(() => Mode.toNormal());
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            const cmd = this.input.value.trim();
+            this.close();
+            if (cmd) {
+              this.execute(cmd);
+            } else {
+              GoogleDocs.restoreFocus(() => Mode.toNormal());
+            }
+          }
+        };
+
+        this.input.addEventListener("keydown", this._handleKeydown);
+      },
+
+      /**
+       * Closes the command input. Does not restore focus - callers handle that.
+       */
+      close() {
+        this.container.style.display = "none";
+        this.input.value = "";
+        if (this._handleKeydown) {
+          this.input.removeEventListener("keydown", this._handleKeydown);
+          this._handleKeydown = null;
+        }
+      },
+
+      /**
+       * Executes a command string.
+       * @param {string} cmdString - The command string entered by the user.
+       */
+      execute(cmdString) {
+        const parts = cmdString.split(/\s+/);
+        const cmdName = parts[0];
+        const args = parts.slice(1);
+
+        if (this.commands[cmdName]) {
+          this.commands[cmdName].execute(args);
+        } else {
+          this.showMessage(
+            `Unknown command: "${cmdName}". Type :help for available commands.`,
+          );
+          GoogleDocs.restoreFocus(() => Mode.toNormal());
+        }
+      },
+
+      /**
+       * Shows a temporary message to the user.
+       * @param {string} message - The message to display.
+       */
+      showMessage(message) {
+        // Create or reuse message element
+        let msgEl = document.getElementById("vim-command-message");
+        if (!msgEl) {
+          msgEl = document.createElement("div");
+          msgEl.id = "vim-command-message";
+          msgEl.style.position = "fixed";
+          msgEl.style.bottom = "60px";
+          msgEl.style.left = "20px";
+          msgEl.style.padding = "8px 16px";
+          msgEl.style.borderRadius = "4px";
+          msgEl.style.fontFamily = "monospace";
+          msgEl.style.fontSize = "13px";
+          msgEl.style.backgroundColor = "#333";
+          msgEl.style.color = "#ff6b6b";
+          msgEl.style.zIndex = "9999";
+          msgEl.style.maxWidth = "400px";
+          document.body.appendChild(msgEl);
+        }
+
+        msgEl.textContent = message;
+        msgEl.style.display = "block";
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+          msgEl.style.display = "none";
+        }, 3000);
+      },
+    };
+
     // Initialize status line and its components
     StatusLine.init();
     Mode.init();
+    Command.init();
 
     const STATE = {
       search: {
@@ -1135,6 +1344,9 @@
         case "x":
           sendKeyEvent("delete");
           break;
+        case ":":
+          Command.open();
+          return;
         case "Enter":
           if (STATE.search.active) closeFindWindow();
           return;
