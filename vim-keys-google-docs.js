@@ -1,7 +1,7 @@
 // vim-keys-google-docs.js
 
 // ==UserScript==
-// @name        VimKeys (Vim for Google Docs)
+// @name        VimDocs (Vim for Google Docs)
 // @namespace   http://tampermonkey.net/
 // @version     1.3.4
 // @description Vim-style keyboard shortcuts for Google Docs. Ported from the DocsKeys extension.
@@ -10,8 +10,8 @@
 // @match       https://docs.google.com/document/*
 // @grant       none
 // @run-at      document-idle
-// @downloadURL https://update.greasyfork.org/scripts/562026/VimKeys%20%28Vim%20for%20Google%20Docs%29.user.js
-// @updateURL https://update.greasyfork.org/scripts/562026/VimKeys%20%28Vim%20for%20Google%20Docs%29.meta.js
+// @downloadURL https://update.greasyfork.org/scripts/562026/VimDocs%20%28Vim%20for%20Google%20Docs%29.user.js
+// @updateURL https://update.greasyfork.org/scripts/562026/VimDocs%20%28Vim%20for%20Google%20Docs%29.meta.js
 // ==/UserScript==
 
 (function () {
@@ -130,19 +130,19 @@
    */
 
   /**
-   * Initializes VimKeys functionality once the Google Docs editor iframe is ready.
+   * Initializes VimDocs functionality once the Google Docs editor iframe is ready.
    * Sets up event listeners, state management, and UI elements for vim emulation.
    */
-  function initVimKeys() {
+  function initVimDocs() {
     const iframe = document.querySelector("iframe.docs-texteventtarget-iframe");
 
     if (!iframe || !iframe.contentDocument || !iframe.contentDocument.body) {
-      setTimeout(initVimKeys, 500);
+      setTimeout(initVimDocs, 500);
 
       return;
     }
 
-    console.debug("VimKeys: Initializing...");
+    console.debug("VimDocs: Initializing...");
     iframe.contentDocument.addEventListener("keydown", eventHandler, true);
 
     const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
@@ -231,10 +231,10 @@
        */
       initIndicator() {
         // Inject style for disabling cursor animation in insert mode
-        const existingStyle = document.getElementById("vim-keys-style");
+        const existingStyle = document.getElementById("vim-docs-style");
         if (existingStyle) existingStyle.remove();
         const style_el = document.createElement("style");
-        style_el.id = "vim-keys-style";
+        style_el.id = "vim-docs-style";
         style_el.textContent =
           ".vim-no-cursor-animation { animation: none !important; }";
         document.head.appendChild(style_el);
@@ -1179,7 +1179,7 @@
       el = findMenuItem(menuItem);
       if (!el) {
         if (!silenceWarning)
-          console.error("VimKeys: Could not find menu item", menuItem.caption);
+          console.error("VimDocs: Could not find menu item", menuItem.caption);
         return null;
       }
       return (menuItemElements[caption] = el);
@@ -1244,7 +1244,7 @@
       const buttons = Array.from(document.querySelectorAll(".menu-button"));
       const button = buttons.find((el) => el.innerText.trim() === menuCaption);
       if (!button) {
-        console.error(`VimKeys: Couldn't find top-level button ${menuCaption}`);
+        console.error(`VimDocs: Couldn't find top-level button ${menuCaption}`);
         return;
       }
       simulateClick(button);
@@ -1254,10 +1254,10 @@
     Mode.toNormal();
   }
 
-  /** Waits for Google Docs editor to be ready, then initializes VimKeys. */
+  /** Waits for Google Docs editor to be ready, then initializes VimDocs. */
   function waitForDocs() {
     const editor = document.querySelector(".docs-texteventtarget-iframe");
-    if (editor) initVimKeys();
+    if (editor) initVimDocs();
     else setTimeout(waitForDocs, 500);
   }
 
