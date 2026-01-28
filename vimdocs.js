@@ -1040,10 +1040,17 @@
         e.preventDefault();
         if (STATE.search.active) {
           const wasCharSearch = STATE.search.isCharSearch;
+          const wasTill = STATE.search.isTill;
           const wasForward = STATE.search.forward;
           closeFindWindow();
           if (wasCharSearch) {
+            if (wasTill && !wasForward) {
+              sendKeyEvent("right");
+              sendKeyEvent("right");
+            } else {
               sendKeyEvent("left");
+              if (wasTill) sendKeyEvent("left");
+            }
           }
         }
         if (Mode.current === "v-line" || Mode.current === "visual")
@@ -1243,6 +1250,7 @@
       STATE.search.active = false;
       STATE.search.forward = true;
       STATE.search.isCharSearch = false;
+      STATE.search.isTill = false;
     }
 
     /**
@@ -1379,15 +1387,28 @@
       // Cancel search if key isn't the cycling key for that search type
       if (STATE.search.active) {
         const isCharCycleKey =
-          STATE.search.isCharSearch && (key === "f" || key === "F");
+          STATE.search.isCharSearch &&
+          (key === "f" ||
+            key === "F" ||
+            key === "t" ||
+            key === "T" ||
+            key === ";" ||
+            key === ",");
         const isSlashCycleKey =
           !STATE.search.isCharSearch && (key === "n" || key === "N");
         if (!isCharCycleKey && !isSlashCycleKey) {
           const wasCharSearch = STATE.search.isCharSearch;
+          const wasTill = STATE.search.isTill;
           const wasForward = STATE.search.forward;
           closeFindWindow();
           if (wasCharSearch) {
+            if (wasTill && !wasForward) {
+              sendKeyEvent("right");
+              sendKeyEvent("right");
+            } else {
               sendKeyEvent("left");
+              if (wasTill) sendKeyEvent("left");
+            }
           }
         }
       }
@@ -1482,17 +1503,16 @@
         case "u":
           clickMenu(menuItems.undo);
           break;
-
         case "r":
           Mode.replace_char = true;
           Mode.toInsert();
           break;
-
         case "f":
           if (STATE.search.active && STATE.search.isCharSearch) {
             sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
           } else {
             STATE.search.forward = true;
+            STATE.search.isTill = false;
             Mode.current = "waitForFindChar";
           }
           return;
@@ -1501,7 +1521,36 @@
             sendKeyEvent("g", { control: true, shift: STATE.search.forward });
           } else {
             STATE.search.forward = false;
+            STATE.search.isTill = false;
             Mode.current = "waitForFindChar";
+          }
+          return;
+        case "t":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          } else {
+            STATE.search.forward = true;
+            STATE.search.isTill = true;
+            Mode.current = "waitForFindChar";
+          }
+          return;
+        case "T":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          } else {
+            STATE.search.forward = false;
+            STATE.search.isTill = true;
+            Mode.current = "waitForFindChar";
+          }
+          return;
+        case ";":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          }
+          return;
+        case ",":
+          if (STATE.search.active && STATE.search.isCharSearch) {
+            sendKeyEvent("g", { control: true, shift: STATE.search.forward });
           }
           return;
         case "/":
