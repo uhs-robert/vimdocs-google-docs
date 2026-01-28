@@ -236,6 +236,9 @@
       minus: 189,
       equal: 187,
       slash: 191,
+      h: 72,
+      n: 78,
+      p: 80,
       bracketLeft: 219,
       bracketRight: 221,
     };
@@ -1322,6 +1325,16 @@
           sendKeyEvent("slash", { alt: true });
           break;
         case "h":
+          // Go to next heading (Ctrl+Alt+N, then Ctrl+Alt+H)
+          sendKeyEvent("n", { control: true, alt: true });
+          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 50);
+          break;
+        case "H":
+          // Go to previous heading (Ctrl+Alt+P, then Ctrl+Alt+H)
+          sendKeyEvent("p", { control: true, alt: true });
+          setTimeout(() => sendKeyEvent("h", { control: true, alt: true }), 50);
+          break;
+        case "?":
           // Show help
           Command.showHelp();
           break;
