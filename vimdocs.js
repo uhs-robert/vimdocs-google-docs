@@ -28,8 +28,6 @@
   Object: Select
   What it would contain: selectToStartOfLine, selectToEndOfLine, selectToStartOfWord, selectToEndOfWord, selectToEndOfPara, selectInnerWord
 
-  Object: Find
-  What it would contain: STATE.search.*, handleFindChar, handleSlashSearch, handleStarSearch, closeFindWindow, hideFindBar
 
   Object: Operator
   What it would contain: STATE.longStringOp, runLongStringOp, waitForFirstInput, waitForSecondInput, waitForTextObject, waitForVisualInput
@@ -703,13 +701,169 @@
     Mode.init();
     Command.init();
 
-    const STATE = {
-      search: {
-        active: false,
-        forward: true, // true for f and /, false for F
-        isCharSearch: false, // true for f/F, false for /
-        lastSearch: null,
+    /*
+     * ======================================================================================
+     * FIND
+     * Manages all search-related state and operations: character search (f/F/t/T),
+     * slash search (/ and ?), star search (* and #), and the Google Docs find bar.
+     * ======================================================================================
+     */
+    const Find = {
+      is_active: false,
+      is_forward: true, // true for f and /, false for F
+      is_char_search: false, // true for f/F/t/T, false for /
+      is_till: false, // true for t/T
+      last_search: null,
+
+      /** Hides the Google Docs find bar and refocuses the editor. */
+      hideFindBar() {
+        const findWindow = GoogleDocs.getFindWindow();
+        if (findWindow) findWindow.style.display = "none";
+
+        GoogleDocs.restoreFocus(() => Mode.toNormal());
       },
+
+      /**
+       * Closes the find window, reversing search direction first if needed.
+       * @param {boolean} forward - If false, reverses direction before closing.
+       */
+      finishSearch(forward) {
+        if (!forward) {
+          setTimeout(() => {
+            sendKeyEvent("g", { control: true, shift: true });
+            Find.hideFindBar();
+          }, 50);
+        } else {
+          Find.hideFindBar();
+        }
+      },
+
+      /**
+       * Handles vim `f` and `F` single-character search.
+       * @param {string} key - The character to search for.
+       */
+      handleFindChar(key) {
+        GoogleDocs.saveActiveElement();
+        sendKeyEvent("f", { control: true });
+
+        setTimeout(() => {
+          const activeEl = document.activeElement;
+          if (activeEl && activeEl.tagName === "INPUT") {
+            activeEl.value = key;
+            activeEl.dispatchEvent(new Event("input", { bubbles: true }));
+            Find.finishSearch(Find.is_forward);
+          }
+        }, 50);
+
+        Find.is_active = true;
+        Find.is_char_search = true;
+        Mode.current = "normal";
+      },
+
+      /**
+       * Handles `/` and `?` search commands.
+       * Opens Google Docs find dialog and either waits for user input or pre-fills
+       * with provided text for repeat searches (n/N).
+       * @param {boolean} [forward=true] - Search direction: true for forward (/), false for backward (?).
+       * @param {string|null} [text=null] - Pre-fill search text for repeat searches. If null, waits for user input.
+       */
+      handleSlashSearch(forward = true, text = null) {
+        GoogleDocs.saveActiveElement();
+        sendKeyEvent("f", { control: true });
+        Find.is_forward = forward;
+        Find.is_active = true;
+        Find.is_char_search = false;
+
+        setTimeout(() => {
+          const findInput = document.activeElement;
+          if (findInput && findInput.tagName === "INPUT") {
+            if (text) {
+              // Pre-fill text and immediately hide
+              findInput.value = text;
+              findInput.dispatchEvent(new Event("input", { bubbles: true }));
+              Find.last_search = text;
+              Find.finishSearch(forward);
+            } else {
+              // Wait for user to type and press Enter
+              const handleEnter = (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.stopImmediatePropagation();
+                  findInput.removeEventListener("keydown", handleEnter, true);
+                  Find.last_search = findInput.value;
+                  Find.finishSearch(forward);
+                }
+              };
+              findInput.addEventListener("keydown", handleEnter, true);
+            }
+          }
+        }, 100);
+      },
+
+      /**
+       * Handles vim-style * and # search commands.
+       * Selects the word under cursor and searches for it in the document.
+       * @param {boolean} [forward=true] - Search direction: true for forward (*), false for backward (#).
+       */
+      handleStarSearch(forward = true) {
+        GoogleDocs.saveActiveElement();
+        selectInnerWord();
+
+        setTimeout(() => {
+          // Get selection from iframe
+          const selection =
+            iframe.contentWindow?.getSelection() || window.getSelection();
+          const selectedText = selection ? selection.toString().trim() : "";
+          sendKeyEvent("right"); // Deselect
+
+          // Open find dialog, simulate search
+          if (selectedText) {
+            sendKeyEvent("f", { control: true });
+            Find.is_forward = forward;
+            Find.is_active = true;
+            Find.is_char_search = false;
+
+            setTimeout(() => {
+              const activeEl = document.activeElement;
+              if (activeEl && activeEl.tagName === "INPUT") {
+                activeEl.value = selectedText;
+                activeEl.dispatchEvent(new Event("input", { bubbles: true }));
+                Find.hideFindBar();
+              }
+            }, 100);
+          }
+        }, 100);
+      },
+
+      /** Closes the Google Docs find bar and resets search state. */
+      closeFindWindow() {
+        const find_window = GoogleDocs.getFindWindow();
+        if (find_window && find_window.style.display === "none") {
+          find_window.style.display = "block";
+          // Find the input inside the find bar and dispatch Escape on it
+          const find_input = find_window.querySelector("input");
+          if (find_input) {
+            find_input.focus();
+            const escEvent = new KeyboardEvent("keydown", {
+              bubbles: true,
+              cancelable: true,
+              key: "Escape",
+              code: "Escape",
+              keyCode: 27,
+              which: 27,
+            });
+            find_input.dispatchEvent(escEvent);
+          }
+        }
+        Find.is_active = false;
+        Find.is_forward = true;
+        Find.is_char_search = false;
+        Find.is_till = false;
+      },
+    };
+
+    const STATE = {
       multipleMotion: {
         times: 0,
         mode: "normal",
@@ -1038,11 +1192,11 @@
 
       if (e.key === "Escape") {
         e.preventDefault();
-        if (STATE.search.active) {
-          const wasCharSearch = STATE.search.isCharSearch;
-          const wasTill = STATE.search.isTill;
-          const wasForward = STATE.search.forward;
-          closeFindWindow();
+        if (Find.is_active) {
+          const wasCharSearch = Find.is_char_search;
+          const wasTill = Find.is_till;
+          const wasForward = Find.is_forward;
+          Find.closeFindWindow();
           if (wasCharSearch) {
             if (wasTill && !wasForward) {
               sendKeyEvent("right");
@@ -1086,7 +1240,7 @@
             handleMultipleMotion(e.key);
             break;
           case "waitForFindChar":
-            handleFindChar(e.key);
+            Find.handleFindChar(e.key);
             break;
           case "waitForIndent":
             handleIndent(e.key);
@@ -1102,155 +1256,6 @@
             break;
         }
       }
-    }
-
-    /**
-     * Hides the Google Docs find bar and refocuses the editor.
-     */
-    function hideFindBar() {
-      const findWindow = GoogleDocs.getFindWindow();
-      if (findWindow) findWindow.style.display = "none";
-
-      GoogleDocs.restoreFocus(() => Mode.toNormal());
-    }
-
-    /**
-     * Closes the find window, reversing search direction first if needed.
-     * @param {boolean} forward - If false, reverses direction before closing.
-     */
-    function finishSearch(forward) {
-      if (!forward) {
-        setTimeout(() => {
-          sendKeyEvent("g", { control: true, shift: true });
-          hideFindBar();
-        }, 100);
-      } else {
-        hideFindBar();
-      }
-    }
-
-    /**
-     * Handles vim `f` and `F` single-character search.
-     * @param {string} key - The character to search for.
-     */
-    function handleFindChar(key) {
-      GoogleDocs.saveActiveElement();
-      sendKeyEvent("f", { control: true });
-
-      setTimeout(() => {
-        const activeEl = document.activeElement;
-        if (activeEl && activeEl.tagName === "INPUT") {
-          activeEl.value = key;
-          activeEl.dispatchEvent(new Event("input", { bubbles: true }));
-          finishSearch(STATE.search.forward);
-        }
-      }, 100);
-
-      STATE.search.active = true;
-      STATE.search.isCharSearch = true;
-      Mode.current = "normal";
-    }
-
-    /**
-     * Handles `/` and `?` search commands.
-     * Opens Google Docs find dialog and either waits for user input or pre-fills
-     * with provided text for repeat searches (n/N).
-     * @param {boolean} [forward=true] - Search direction: true for forward (/), false for backward (?).
-     * @param {string|null} [text=null] - Pre-fill search text for repeat searches. If null, waits for user input.
-     */
-    function handleSlashSearch(forward = true, text = null) {
-      GoogleDocs.saveActiveElement();
-      sendKeyEvent("f", { control: true });
-      STATE.search.forward = forward;
-      STATE.search.active = true;
-      STATE.search.isCharSearch = false;
-
-      setTimeout(() => {
-        const findInput = document.activeElement;
-        if (findInput && findInput.tagName === "INPUT") {
-          if (text) {
-            // Pre-fill text and immediately hide
-            findInput.value = text;
-            findInput.dispatchEvent(new Event("input", { bubbles: true }));
-            STATE.search.lastSearch = text;
-            finishSearch(forward);
-          } else {
-            // Wait for user to type and press Enter
-            const handleEnter = (e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                findInput.removeEventListener("keydown", handleEnter, true);
-                STATE.search.lastSearch = findInput.value;
-                finishSearch(forward);
-              }
-            };
-            findInput.addEventListener("keydown", handleEnter, true);
-          }
-        }
-      }, 100);
-    }
-
-    /**
-     * Handles vim-style * and # search commands.
-     * Selects the word under cursor and searches for it in the document.
-     * @param {boolean} [forward=true] - Search direction: true for forward (*), false for backward (#).
-     */
-    function handleStarSearch(forward = true) {
-      GoogleDocs.saveActiveElement();
-      selectInnerWord();
-
-      setTimeout(() => {
-        // Get selection from iframe
-        const selection =
-          iframe.contentWindow?.getSelection() || window.getSelection();
-        const selectedText = selection ? selection.toString().trim() : "";
-        sendKeyEvent("right"); // Deselect
-
-        // Open find dialog, simulate search
-        if (selectedText) {
-          sendKeyEvent("f", { control: true });
-          STATE.search.forward = forward;
-          STATE.search.active = true;
-          STATE.search.isCharSearch = false;
-
-          setTimeout(() => {
-            const activeEl = document.activeElement;
-            if (activeEl && activeEl.tagName === "INPUT") {
-              activeEl.value = selectedText;
-              activeEl.dispatchEvent(new Event("input", { bubbles: true }));
-              hideFindBar();
-            }
-          }, 100);
-        }
-      }, 100);
-    }
-
-    /** Closes the Google Docs find bar and resets search state. */
-    function closeFindWindow() {
-      const find_window = GoogleDocs.getFindWindow();
-      if (find_window && find_window.style.display === "none") {
-        find_window.style.display = "block";
-        // Find the input inside the find bar and dispatch Escape on it
-        const find_input = find_window.querySelector("input");
-        if (find_input) {
-          find_input.focus();
-          const escEvent = new KeyboardEvent("keydown", {
-            bubbles: true,
-            cancelable: true,
-            key: "Escape",
-            code: "Escape",
-            keyCode: 27,
-            which: 27,
-          });
-          find_input.dispatchEvent(escEvent);
-        }
-      }
-      STATE.search.active = false;
-      STATE.search.forward = true;
-      STATE.search.isCharSearch = false;
-      STATE.search.isTill = false;
     }
 
     /**
@@ -1393,9 +1398,9 @@
       }
 
       // Cancel search if key isn't the cycling key for that search type
-      if (STATE.search.active) {
+      if (Find.is_active) {
         const isCharCycleKey =
-          STATE.search.isCharSearch &&
+          Find.is_char_search &&
           (key === "f" ||
             key === "F" ||
             key === "t" ||
@@ -1403,12 +1408,12 @@
             key === ";" ||
             key === ",");
         const isSlashCycleKey =
-          !STATE.search.isCharSearch && (key === "n" || key === "N");
+          !Find.is_char_search && (key === "n" || key === "N");
         if (!isCharCycleKey && !isSlashCycleKey) {
-          const wasCharSearch = STATE.search.isCharSearch;
-          const wasTill = STATE.search.isTill;
-          const wasForward = STATE.search.forward;
-          closeFindWindow();
+          const wasCharSearch = Find.is_char_search;
+          const wasTill = Find.is_till;
+          const wasForward = Find.is_forward;
+          Find.closeFindWindow();
           if (wasCharSearch) {
             if (wasTill && !wasForward) {
               sendKeyEvent("right");
@@ -1520,75 +1525,75 @@
           Mode.toInsert();
           break;
         case "f":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: !Find.is_forward });
           } else {
-            STATE.search.forward = true;
-            STATE.search.isTill = false;
+            Find.is_forward = true;
+            Find.is_till = false;
             Mode.current = "waitForFindChar";
           }
           return;
         case "F":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: Find.is_forward });
           } else {
-            STATE.search.forward = false;
-            STATE.search.isTill = false;
+            Find.is_forward = false;
+            Find.is_till = false;
             Mode.current = "waitForFindChar";
           }
           return;
         case "t":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: !Find.is_forward });
           } else {
-            STATE.search.forward = true;
-            STATE.search.isTill = true;
+            Find.is_forward = true;
+            Find.is_till = true;
             Mode.current = "waitForFindChar";
           }
           return;
         case "T":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: !Find.is_forward });
           } else {
-            STATE.search.forward = false;
-            STATE.search.isTill = true;
+            Find.is_forward = false;
+            Find.is_till = true;
             Mode.current = "waitForFindChar";
           }
           return;
         case ";":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: !Find.is_forward });
           }
           return;
         case ",":
-          if (STATE.search.active && STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: STATE.search.forward });
+          if (Find.is_active && Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: Find.is_forward });
           }
           return;
         case "/":
-          handleSlashSearch(true);
+          Find.handleSlashSearch(true);
           return;
         case "?":
-          handleSlashSearch(false);
+          Find.handleSlashSearch(false);
           return;
         case "*":
-          handleStarSearch(true);
+          Find.handleStarSearch(true);
           return;
         case "#":
-          handleStarSearch(false);
+          Find.handleStarSearch(false);
           return;
         case "n":
-          if (STATE.search.active && !STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: !STATE.search.forward });
-          } else if (!STATE.search.active && STATE.search.lastSearch) {
-            handleSlashSearch(true, STATE.search.lastSearch);
+          if (Find.is_active && !Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: !Find.is_forward });
+          } else if (!Find.is_active && Find.last_search) {
+            Find.handleSlashSearch(true, Find.last_search);
           }
           return;
         case "N":
-          if (STATE.search.active && !STATE.search.isCharSearch) {
-            sendKeyEvent("g", { control: true, shift: STATE.search.forward });
-          } else if (!STATE.search.active && STATE.search.lastSearch) {
-            handleSlashSearch(false, STATE.search.lastSearch);
+          if (Find.is_active && !Find.is_char_search) {
+            sendKeyEvent("g", { control: true, shift: Find.is_forward });
+          } else if (!Find.is_active && Find.last_search) {
+            Find.handleSlashSearch(false, Find.last_search);
           }
           return;
         case "x":
@@ -1611,7 +1616,7 @@
           Command.open();
           return;
         case "Enter":
-          if (STATE.search.active) closeFindWindow();
+          if (Find.is_active) Find.closeFindWindow();
           return;
         case "Backspace":
           sendKeyEvent("left");
