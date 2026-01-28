@@ -16,7 +16,6 @@
 
 // TODO: Add more `:` commands (e.g., :q, :run (open alt+/), :$s/text/replace/gc etc.)
 // TODO: `>` and `<` to Ctrl+[ and Ctrl+] respectively for paragraph indentation
-// TODO: `z` to trigger zoom options: (- for zoomout, = for zoomin, z for 100%)
 // TODO: `g` to trigger go options: gg=to top, gf=follow link (), gm=open menu (alt+/), gu=lowercase, gU=uppercase g[=previousTab, g]=nextTab, gh=showHelp)
 // TODO: `.` is repeat last action (ctrl+y)
 
@@ -221,6 +220,15 @@
       f: 70,
       g: 71,
       v: 86,
+      y: 89,
+      zero: 48,
+      seven: 55,
+      eight: 56,
+      nine: 57,
+      minus: 189,
+      equal: 187,
+      bracketLeft: 219,
+      bracketRight: 221,
     };
 
     const wordModifierKey = isMac ? "alt" : "control";
@@ -410,6 +418,7 @@
           this.current === "waitForVisualInput" ||
           this.current === "waitForTextObject" ||
           this.current === "waitForFindChar" ||
+          this.current === "waitForZoom" ||
           this.current === "multipleMotion"
         );
       },
@@ -1046,6 +1055,9 @@
           case "waitForFindChar":
             handleFindChar(e.key);
             break;
+          case "waitForZoom":
+            handleZoom(e.key);
+            break;
         }
       }
     }
@@ -1181,6 +1193,28 @@
         STATE.search.forward = true;
         STATE.search.isCharSearch = false;
       }
+    }
+
+    /**
+     * Handles zoom commands (vim `z-`, `z=`, `zz`).
+     * @param {string} key - The key pressed after `z`.
+     */
+    function handleZoom(key) {
+      switch (key) {
+        case "-":
+          // Zoom out (Ctrl + -)
+          sendKeyEvent("minus", { control: true });
+          break;
+        case "=":
+          // Zoom in (Ctrl + =)
+          sendKeyEvent("equal", { control: true });
+          break;
+        case "z":
+          // Reset zoom to 100% (Ctrl + 0)
+          sendKeyEvent("zero", { control: true });
+          break;
+      }
+      Mode.toNormal();
     }
 
     /**
@@ -1344,6 +1378,9 @@
         case "x":
           sendKeyEvent("delete");
           break;
+        case "z":
+          Mode.current = "waitForZoom";
+          return;
         case ":":
           Command.open();
           return;
