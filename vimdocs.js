@@ -760,7 +760,7 @@
     }
     /** Moves cursor to top of document (vim `gg`). */
     function goToTop() {
-      sendKeyEvent("home", { control: true, shift: true });
+      sendKeyEvent("home", { control: true });
       STATE.longStringOp = "";
     }
     /** Selects from cursor to end of paragraph. */
