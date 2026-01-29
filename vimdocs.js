@@ -17,6 +17,8 @@
 // TODO: Add more `:` commands (e.g., :q, :run (open alt+/), :$s/text/replace/gc etc.)
 // TODO: `g` remaining options: gu=lowercase, gU=uppercase, g[=previousTab, g]=nextTab
 // TODO: Add keymap list to the help menu.
+// TODO: Add wait after `1-9`, `operator`, to complete the motion.
+// TODO: Add paragraph commands like `d i p`
 
 (function () {
   "use strict";
@@ -39,7 +41,9 @@
       insert: { bg: "#2B8A5E", fg: "white" },
       visual: { bg: "#FFA653", fg: "#101825" },
       "v-line": { bg: "#FFA653", fg: "#101825" },
-      wait: { bg: "indianred", fg: "white" },
+      command: { bg: "#C08DFF", fg: "#101825" },
+      wait: { bg: "#68BFB5", fg: "#101825" },
+      replace: { bg: "indianred", fg: "white" },
     },
   };
 
@@ -369,6 +373,8 @@
           case "insert":
           case "visual":
           case "v-line":
+          case "command":
+          case "replace":
             color_key = this.current;
             this.indicator.textContent = this.current.toUpperCase();
             break;
@@ -488,6 +494,18 @@
        */
       toInsert() {
         this.set("insert");
+        const cursor = GoogleDocs.getCursor();
+        if (cursor) {
+          const parent = cursor.parentElement;
+          if (parent) parent.classList.add("vim-no-cursor-animation");
+        }
+      },
+
+      /**
+       * Switches to replace mode.
+       */
+      toReplace() {
+        this.set("replace");
         const cursor = GoogleDocs.getCursor();
         if (cursor) {
           const parent = cursor.parentElement;
@@ -1222,6 +1240,7 @@
       /** Mode-to-handler dispatch table. */
       _dispatch: {
         normal: (key) => Vim.handleNormal(key),
+        command: (key) => Vim.handleNormal(key),
         visual: (key) => Vim.handleVisualLine(key),
         "v-line": (key) => Vim.handleVisualLine(key),
         waitForFirstInput: (key) => Operate.waitForFirstInput(key),
@@ -1316,6 +1335,18 @@
        * @returns {boolean} True if the event was consumed.
        */
       handleReplaceChar(e) {
+        if (Mode.current === "replace") {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            Mode.toNormal();
+            return true;
+          }
+          if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1) {
+            Keys.send("delete");
+            return true;
+          }
+          return false;
+        }
         if (Mode.current !== "insert" || !Mode.replace_char) return false;
 
         if (e.key === "Escape") {
@@ -1566,6 +1597,9 @@
             Mode.replace_char = true;
             Mode.toInsert();
             break;
+          case "R":
+            Mode.toReplace();
+            break;
           case "f":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
@@ -1655,6 +1689,7 @@
             Mode.set("waitForZoom");
             return;
           case ":":
+            Mode.set("command");
             Command.open();
             return;
           case "Enter":
