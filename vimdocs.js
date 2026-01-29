@@ -325,6 +325,7 @@
       temp_normal: false,
       replace_char: false,
       indicator: null,
+      visual_direction: "right",
 
       /**
        * Initializes the mode indicator element.
@@ -435,6 +436,7 @@
        */
       toVisual() {
         this.set("visual");
+        this.visual_direction = "right";
         Keys.send("right", { shift: true });
       },
 
@@ -443,6 +445,7 @@
        */
       toVisualLine() {
         this.set("v-line");
+        this.visual_direction = "right";
         Move.toStartOfLine();
         Select.toEndOfLine();
       },
@@ -457,6 +460,7 @@
           Keys.send("left");
         }
 
+        this.visual_direction = "right";
         this.set("normal");
         this.replace_char = false;
 
@@ -792,7 +796,7 @@
               findInput.addEventListener("keydown", handleEnter, true);
             }
           }
-        }, 100);
+        }, 50);
       },
 
       /**
@@ -835,12 +839,10 @@
        * cursor position for character searches (f/F/t/T).
        */
       cancelSearch() {
-        const wasCharSearch = Find.is_char_search;
         const wasTill = Find.is_till;
         const wasForward = Find.is_forward;
         Find.closeFindWindow();
-        if (wasCharSearch) {
-          if (wasTill && !wasForward) {
+        if (wasTill && !wasForward) {
             Keys.send("right");
             Keys.send("right");
           } else {
@@ -1331,7 +1333,12 @@
        */
       handleEscape() {
         if (Find.is_active) Find.cancelSearch();
-        if (Mode.isVisual()) Keys.send("right");
+        if (Mode.isVisual()) {
+          const direction = Mode.visual_direction === "left" ? "left" : "right";
+          Keys.send(direction);
+          Mode.toNormal(true);
+          return;
+        }
         Mode.toNormal();
       },
 
@@ -1681,6 +1688,7 @@
           case "":
             break;
           case "h":
+            Mode.visual_direction = "left";
             Keys.send("left", { shift: true });
             break;
           case "j":
@@ -1690,6 +1698,7 @@
             Keys.send("up", { shift: true });
             break;
           case "l":
+            Mode.visual_direction = "right";
             Keys.send("right", { shift: true });
             break;
           case "p":
