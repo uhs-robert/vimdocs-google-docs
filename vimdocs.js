@@ -17,7 +17,6 @@
 // TODO: Add more `:` commands (e.g., :q, :run (open alt+/), :$s/text/replace/gc etc.)
 // TODO: `g` remaining options: gu=lowercase, gU=uppercase, g[=previousTab, g]=nextTab
 // TODO: Add keymap list to the help menu.
-// TODO: Add wait after `1-9`, `operator`, to complete the motion.
 
 (function () {
   "use strict";
@@ -1105,8 +1104,29 @@
     const Operate = {
       /** The pending operator key (c, d, y, etc.). */
       pending: "",
+      /** The operator count (e.g., `2dw`). */
+      operator_count: 1,
+      /** The motion count after operator (e.g., `d2w`). */
+      motion_count: 0,
       /** The pending text object scope (i, a). */
       pending_text_object: "",
+
+      /**
+       * Returns the effective repeat count for the pending operation.
+       * @returns {number} The combined operator and motion count.
+       */
+      getRepeatCount() {
+        const motion = this.motion_count || 1;
+        return this.operator_count * motion;
+      },
+
+      /** Resets pending operator state. */
+      reset() {
+        this.pending = "";
+        this.operator_count = 1;
+        this.motion_count = 0;
+        this.pending_text_object = "";
+      },
 
       /**
        * Executes the pending operator on the current selection.
@@ -1137,6 +1157,7 @@
             Move.toTop();
             break;
         }
+        Operate.reset();
       },
 
       /**
@@ -1144,6 +1165,14 @@
        * @param {string} key - The motion or text-object key.
        */
       waitForFirstInput(key) {
+        if (/[0-9]/.test(key)) {
+          const nextCount = Operate.motion_count
+            ? Number(String(Operate.motion_count) + key)
+            : Number(key);
+          Operate.motion_count = nextCount;
+          return;
+        }
+        const repeat = Operate.getRepeatCount();
         switch (key) {
           case "i":
             Operate.pending_text_object = "i";
@@ -1154,11 +1183,11 @@
             Mode.set("waitForTextObject");
             break;
           case "w":
-            Select.toEndOfWord();
+            for (let i = 0; i < repeat; i++) Select.toEndOfWord();
             Operate.run();
             break;
           case "p":
-            Select.toEndOfPara();
+            for (let i = 0; i < repeat; i++) Select.toEndOfPara();
             Operate.run();
             break;
           case "^":
@@ -1173,14 +1202,21 @@
             break;
           case Operate.pending:
             Move.toStartOfLine();
-            if (Operate.pending === "d" || Operate.pending === "y") {
-              Keys.send("down", { shift: true });
+            if (
+              Operate.pending === "d" ||
+              Operate.pending === "y" ||
+              Operate.pending === "c"
+            ) {
+              for (let i = 0; i < repeat; i++) {
+                Keys.send("down", { shift: true });
+              }
             } else {
               Select.toEndOfLine();
             }
             Operate.run();
             break;
           default:
+            Operate.reset();
             Mode.toNormal();
         }
       },
@@ -1210,6 +1246,7 @@
        * @param {string} key - The text object key (w for word, etc.).
        */
       waitForTextObject(key) {
+        const repeat = Operate.getRepeatCount();
         switch (key) {
           case "w":
             Select.innerWord();
@@ -1217,10 +1254,18 @@
             Operate.run();
             break;
           case "p":
-            if (Operate.pending_text_object === "a") {
-              Select.aroundPara();
-            } else {
-              Select.innerPara();
+            if (repeat > 0) {
+              if (Operate.pending_text_object === "a") {
+                Select.aroundPara();
+              } else {
+                Select.innerPara();
+              }
+              for (let i = 1; i < repeat; i++) {
+                Select.toEndOfPara();
+                if (Operate.pending_text_object === "a") {
+                  Keys.send("down", { shift: true });
+                }
+              }
             }
             Operate.pending_text_object = "";
             Operate.run();
@@ -1305,6 +1350,16 @@
       handleMultipleMotion(key) {
         if (/[0-9]/.test(key)) {
           Vim._repeat.times = Number(String(Vim._repeat.times) + key);
+          return;
+        }
+        if (
+          Vim._repeat.mode === "normal" &&
+          (key === "c" || key === "d" || key === "y")
+        ) {
+          Operate.pending = key;
+          Operate.operator_count = Vim._repeat.times;
+          Operate.motion_count = 0;
+          Mode.set("waitForFirstInput");
           return;
         }
         switch (Vim._repeat.mode) {
@@ -1575,6 +1630,8 @@
           case "d":
           case "y":
             Operate.pending = key;
+            Operate.operator_count = 1;
+            Operate.motion_count = 0;
             Mode.set("waitForFirstInput");
             break;
           case "p":
