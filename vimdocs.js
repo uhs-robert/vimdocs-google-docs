@@ -1139,20 +1139,67 @@
 
     /*
      * ======================================================================================
+     * REGISTER & TEXT INSERTION
+     * In-memory register for yank/delete/change and programmatic text insertion.
+     * ======================================================================================
+     */
+    const Register = {
+      text: "",
+      type: "char", // "char" or "line"
+      save(text, type = "char") {
+        this.text = text;
+        this.type = type;
+      },
+    };
+
+    function insertText(text) {
+      const iframe = GoogleDocs.getEditorIframe();
+      const doc = iframe?.contentDocument;
+      const target =
+        doc && (doc.querySelector('[contenteditable="true"]') || doc.body);
+      if (!target || !doc) return;
+      try {
+        target.focus();
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        const ev = new InputEvent("beforeinput", {
+          inputType: "insertReplacementText",
+          data: text,
+          dataTransfer: dt,
+          bubbles: true,
+          cancelable: true,
+        });
+        target.dispatchEvent(ev);
+      } catch (_) {
+        try {
+          doc.execCommand("insertText", false, text);
+        } catch (e) {}
+      }
+    }
+
+    function getSelectedText() {
+      const iframe = GoogleDocs.getEditorIframe();
+      try {
+        const sel = iframe?.contentWindow?.getSelection();
+        return sel ? sel.toString() : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    /*
+     * ======================================================================================
      * OPERATE
      * Operator-pending mode logic: handles compound commands like `dw`, `ciw`, `yap`.
      * Manages the pending operator state and dispatches to motion/text-object handlers.
      * ======================================================================================
      */
     const Operate = {
-      /** The pending operator key (c, d, y, etc.). */
-      pending: "",
-      /** The operator count (e.g., `2dw`). */
-      operator_count: 1,
-      /** The motion count after operator (e.g., `d2w`). */
-      motion_count: 0,
-      /** The pending text object scope (i, a). */
-      pending_text_object: "",
+      pending: "", // The pending operator key (c, d, y, etc.).
+      operator_count: 1, // The operator count (e.g., `2dw`).
+      motion_count: 0, // The motion count after operator (e.g., `d2w`).
+      pending_text_object: "", // The pending text object scope (i, a).
+      isLinewise: false, // Whether the current operation is line-wise.
 
       /**
        * Returns the effective repeat count for the pending operation.
@@ -1169,6 +1216,7 @@
         this.operator_count = 1;
         this.motion_count = 0;
         this.pending_text_object = "";
+        this.isLinewise = false;
       },
 
       /**
@@ -1176,16 +1224,21 @@
        * @param {string} [operation=Operate.pending] - The operator to execute.
        */
       run(operation = Operate.pending) {
+        const selected = getSelectedText();
+        const isLine = Operate.isLinewise || Mode.current === "v-line";
         switch (operation) {
           case "c":
+            if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.cut);
             Mode.toInsert();
             break;
           case "d":
+            if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.cut);
             Mode.toNormal(true);
             break;
           case "y":
+            if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.copy);
             Keys.send("left");
             Mode.toNormal(true);
@@ -1250,6 +1303,7 @@
               Operate.pending === "y" ||
               Operate.pending === "c"
             ) {
+              Operate.isLinewise = true;
               for (let i = 0; i < repeat; i++) {
                 Keys.send("down", { shift: true });
               }
@@ -1704,7 +1758,26 @@
             Mode.set("waitForFirstInput");
             break;
           case "p":
-            //FIX: Keys.send("v", Keys.clipboardMods());
+            if (Register.text) {
+              if (Register.type === "line") {
+                Move.toEndOfLine();
+                insertText("\n" + Register.text);
+              } else {
+                Keys.send("right");
+                insertText(Register.text);
+              }
+            }
+            break;
+          case "P":
+            if (Register.text) {
+              if (Register.type === "line") {
+                Move.toStartOfLine();
+                insertText(Register.text + "\n");
+                Keys.send("up");
+              } else {
+                insertText(Register.text);
+              }
+            }
             break;
           case "a":
             Edit.append();
@@ -1728,15 +1801,21 @@
           case "$":
             Move.toEndOfLine();
             break;
-          case "C":
+          case "C": {
             Select.toEndOfLine();
+            const selection = getSelectedText();
+            if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             Mode.toInsert();
             break;
-          case "D":
+          }
+          case "D": {
             Select.toEndOfLine();
+            const selection = getSelectedText();
+            if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             break;
+          }
           case "v":
             Mode.toVisual();
             break;
@@ -1831,9 +1910,13 @@
               Find.handleSlashSearch(false, Find.last_search);
             }
             return;
-          case "x":
-            Keys.send("delete");
+          case "x": {
+            Keys.send("right", { shift: true });
+            const selection = getSelectedText();
+            if (selection) Register.save(selection);
+            Menu.click(Menu.items.cut);
             break;
+          }
           case ".":
             // Repeat last action (redo)
             Keys.send("y", { control: true });
@@ -1905,10 +1988,15 @@
             Mode.visual_direction = "right";
             Keys.send("right", { shift: true });
             break;
-          case "p":
-            //FIX: Keys.send("v", Keys.clipboardMods());
+          case "p": {
+            const selected = getSelectedText();
+            if (Register.text) {
+              insertText(Register.text);
+            }
+            if (selected) Register.save(selected);
             Mode.toNormal(true);
             break;
+          }
           case "}":
             Move.toEndOfPara(true);
             break;
@@ -1946,10 +2034,13 @@
             Operate.pending_text_object = key;
             Mode.set("waitForVisualInput");
             break;
-          case "x":
+          case "x": {
+            const selection = getSelectedText();
+            if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             Mode.toNormal(true);
             break;
+          }
           case ">":
             // Indent selection
             Keys.send("bracketRight", { control: true });
