@@ -14,7 +14,7 @@
 // @updateURL https://update.greasyfork.org/scripts/562026/VimDocs%20%28Vim%20for%20Google%20Docs%29.meta.js
 // ==/UserScript==
 
-// TODO: Add more `:` commands (e.g., save each entry to cache and press up to cycle through history)
+// TODO: Add more `:` commands
 // TODO: Add keymap list to the help menu.
 //TODO: Add README
 //TODO: Add to greasyfork
@@ -528,6 +528,9 @@
     const Command = {
       container: null,
       input: null,
+      history: [],
+      historyIndex: -1,
+      savedInput: "",
 
       /**
        * Available commands registry.
@@ -656,6 +659,8 @@
 
         this.container.style.display = "block";
         this.input.value = "";
+        this.historyIndex = -1;
+        this.savedInput = "";
         this.input.focus();
 
         // Set up event listeners
@@ -671,9 +676,30 @@
             const cmd = this.input.value.trim();
             this.close();
             if (cmd) {
+              this.history.push(cmd);
               this.execute(cmd);
             } else {
               GoogleDocs.restoreFocus(() => Mode.toNormal());
+            }
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (this.history.length === 0) return;
+            if (this.historyIndex === -1) {
+              this.savedInput = this.input.value;
+              this.historyIndex = this.history.length - 1;
+            } else if (this.historyIndex > 0) {
+              this.historyIndex--;
+            }
+            this.input.value = this.history[this.historyIndex];
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (this.historyIndex === -1) return;
+            if (this.historyIndex < this.history.length - 1) {
+              this.historyIndex++;
+              this.input.value = this.history[this.historyIndex];
+            } else {
+              this.historyIndex = -1;
+              this.input.value = this.savedInput;
             }
           }
         };
