@@ -15,7 +15,6 @@
 // ==/UserScript==
 
 // TODO: Add more `:` commands
-// TODO: Add keymap list to the help menu.
 //TODO: Add README
 //TODO: Add to greasyfork
 
@@ -283,6 +282,196 @@
 
     /*
      * ======================================================================================
+     * KEYMAP
+     * Single source of truth for all key bindings, organised by mode.
+     * Each entry maps a key to { action, description }.
+     * Handlers switch on `KeyMap.<mode>[key]?.action` instead of raw characters.
+     * ======================================================================================
+     */
+    const KeyMap = {
+      normal: {
+        h: { action: "moveLeft", description: "Move left" },
+        j: { action: "moveDown", description: "Move down" },
+        k: { action: "moveUp", description: "Move up" },
+        l: { action: "moveRight", description: "Move right" },
+        "}": { action: "paraForward", description: "Jump to next paragraph" },
+        "{": { action: "paraBack", description: "Jump to previous paragraph" },
+        b: { action: "wordBack", description: "Move to previous word" },
+        B: { action: "wordBack", description: "Move to previous word" },
+        e: { action: "wordEnd", description: "Move to end of word" },
+        E: { action: "wordEnd", description: "Move to end of word" },
+        w: { action: "wordForward", description: "Move to next word" },
+        W: { action: "wordForward", description: "Move to next word" },
+        g: { action: "goPrefix", description: "Enter go-command mode" },
+        G: { action: "goBottom", description: "Go to end of document" },
+        c: { action: "change", description: "Change (operator)" },
+        d: { action: "delete", description: "Delete (operator)" },
+        y: { action: "yank", description: "Yank/copy (operator)" },
+        p: { action: "pasteAfter", description: "Paste after cursor" },
+        P: { action: "pasteBefore", description: "Paste before cursor" },
+        a: { action: "append", description: "Append after cursor" },
+        A: { action: "appendLine", description: "Append at end of line" },
+        i: { action: "insert", description: "Insert before cursor" },
+        I: { action: "insertLine", description: "Insert at start of line" },
+        "^": { action: "lineStart", description: "Move to start of line" },
+        _: { action: "lineStart", description: "Move to start of line" },
+        0: { action: "lineStart", description: "Move to start of line" },
+        $: { action: "lineEnd", description: "Move to end of line" },
+        C: { action: "changeToEnd", description: "Change to end of line" },
+        D: { action: "deleteToEnd", description: "Delete to end of line" },
+        v: { action: "visual", description: "Enter visual mode" },
+        V: { action: "visualLine", description: "Enter visual line mode" },
+        o: { action: "openBelow", description: "Open line below" },
+        O: { action: "openAbove", description: "Open line above" },
+        u: { action: "undo", description: "Undo" },
+        r: { action: "replaceChar", description: "Replace single character" },
+        R: { action: "replaceMode", description: "Enter replace mode" },
+        f: { action: "findForward", description: "Find char forward" },
+        F: { action: "findBackward", description: "Find char backward" },
+        t: { action: "tillForward", description: "Till char forward" },
+        T: { action: "tillBackward", description: "Till char backward" },
+        ";": { action: "repeatFind", description: "Repeat last f/F/t/T" },
+        ",": {
+          action: "repeatFindBack",
+          description: "Repeat last f/F/t/T reversed",
+        },
+        "/": { action: "searchForward", description: "Search forward" },
+        "?": { action: "searchBackward", description: "Search backward" },
+        "*": {
+          action: "searchWordForward",
+          description: "Search word under cursor forward",
+        },
+        "#": {
+          action: "searchWordBackward",
+          description: "Search word under cursor backward",
+        },
+        n: { action: "searchNext", description: "Next search result" },
+        N: { action: "searchPrev", description: "Previous search result" },
+        x: {
+          action: "deleteChar",
+          description: "Delete character under cursor",
+        },
+        ".": { action: "repeat", description: "Repeat last action" },
+        ">": { action: "indentPrefix", description: "Enter indent mode" },
+        "<": { action: "outdentPrefix", description: "Enter outdent mode" },
+        z: { action: "zoomPrefix", description: "Enter zoom mode" },
+        ":": { action: "commandMode", description: "Open command line" },
+        Enter: { action: "enterKey", description: "Close find window" },
+        Backspace: { action: "backspace", description: "Move left" },
+      },
+      visual: {
+        g: { action: "goPrefix", description: "Enter go-command mode" },
+        h: { action: "selectLeft", description: "Extend selection left" },
+        j: { action: "selectDown", description: "Extend selection down" },
+        k: { action: "selectUp", description: "Extend selection up" },
+        l: { action: "selectRight", description: "Extend selection right" },
+        p: {
+          action: "replaceWithRegister",
+          description: "Replace selection with register",
+        },
+        "}": {
+          action: "selectParaForward",
+          description: "Extend selection to next paragraph",
+        },
+        "{": {
+          action: "selectParaBack",
+          description: "Extend selection to previous paragraph",
+        },
+        b: {
+          action: "selectWordBack",
+          description: "Extend selection to previous word",
+        },
+        e: {
+          action: "selectWordEnd",
+          description: "Extend selection to end of word",
+        },
+        w: {
+          action: "selectWordEnd",
+          description: "Extend selection to end of word",
+        },
+        "^": {
+          action: "selectLineStart",
+          description: "Extend selection to start of line",
+        },
+        _: {
+          action: "selectLineStart",
+          description: "Extend selection to start of line",
+        },
+        0: {
+          action: "selectLineStart",
+          description: "Extend selection to start of line",
+        },
+        $: {
+          action: "selectLineEnd",
+          description: "Extend selection to end of line",
+        },
+        G: {
+          action: "selectToBottom",
+          description: "Extend selection to end of document",
+        },
+        c: { action: "change", description: "Change selection" },
+        d: { action: "delete", description: "Delete selection" },
+        y: { action: "yank", description: "Yank/copy selection" },
+        i: { action: "innerPrefix", description: "Inner text object" },
+        a: { action: "aroundPrefix", description: "Around text object" },
+        x: { action: "deleteSelection", description: "Delete selection" },
+        ">": { action: "indentSelection", description: "Indent selection" },
+        "<": { action: "outdentSelection", description: "Outdent selection" },
+      },
+      operator: {
+        i: { action: "inner", description: "Inner text object" },
+        a: { action: "around", description: "Around text object" },
+        w: { action: "word", description: "Word forward" },
+        p: { action: "paragraph", description: "Paragraph forward" },
+        "^": { action: "lineStart", description: "To start of line" },
+        _: { action: "lineStart", description: "To start of line" },
+        0: { action: "lineStart", description: "To start of line" },
+        $: { action: "lineEnd", description: "To end of line" },
+      },
+      textObject: {
+        w: { action: "word", description: "Word" },
+        p: { action: "paragraph", description: "Paragraph" },
+      },
+      go: {
+        g: { action: "goTop", description: "Go to top of document" },
+        u: { action: "lowercase", description: "Lowercase selection" },
+        U: { action: "uppercase", description: "Uppercase selection" },
+        f: { action: "followLink", description: "Follow link at cursor" },
+        m: { action: "menuSearch", description: "Open menu search" },
+        "/": { action: "menuSearch", description: "Open menu search" },
+        h: { action: "nextHeading", description: "Go to next heading" },
+        H: { action: "prevHeading", description: "Go to previous heading" },
+        "?": { action: "showHelp", description: "Show help" },
+        T: { action: "prevTab", description: "Go to previous tab" },
+        t: { action: "nextTab", description: "Go to next tab" },
+      },
+      zoom: {
+        "-": { action: "zoomOut", description: "Zoom out" },
+        "=": { action: "zoomIn", description: "Zoom in" },
+        z: { action: "zoomReset", description: "Reset zoom to 100%" },
+      },
+      indent: {
+        ">": { action: "indent", description: "Indent line" },
+        "*": { action: "bulletList", description: "Toggle bullet list" },
+        "-": { action: "bulletList", description: "Toggle bullet list" },
+        l: { action: "bulletList", description: "Toggle bullet list" },
+        n: { action: "numberedList", description: "Toggle numbered list" },
+        "[": { action: "checklist", description: "Toggle checklist" },
+        "]": { action: "checklist", description: "Toggle checklist" },
+        t: { action: "checklist", description: "Toggle checklist" },
+      },
+      outdent: {
+        "<": { action: "outdent", description: "Outdent line" },
+        "*": { action: "bulletList", description: "Toggle bullet list" },
+        "-": { action: "bulletList", description: "Toggle bullet list" },
+        n: { action: "numberedList", description: "Toggle numbered list" },
+        "[": { action: "checklist", description: "Toggle checklist" },
+        "]": { action: "checklist", description: "Toggle checklist" },
+      },
+    };
+
+    /*
+     * ======================================================================================
      * STATUS LINE
      * Container for the status bar UI at the bottom of the screen.
      * Other components (Mode, Command) append their elements to this container.
@@ -543,6 +732,12 @@
             Command.showHelp();
           },
         },
+        h: {
+          description: "Show available commands (alias for :help)",
+          execute: () => {
+            Command.showHelp();
+          },
+        },
         run: {
           description: "Open menu search (Alt+/)",
           execute: () => {
@@ -589,7 +784,7 @@
         this.input.style.outline = "none";
         this.input.style.backgroundColor = "#1a1a1a";
         this.input.style.color = "white";
-        this.input.placeholder = ":";
+        this.input.placeholder = ":h";
 
         this.container.appendChild(this.input);
         StatusLine.container.appendChild(this.container);
@@ -622,30 +817,73 @@
           document.body.appendChild(helpEl);
         }
 
-        // Build help content
+        // Build help content from KeyMap and : commands
+        const modeLabels = {
+          normal: "NORMAL MODE",
+          visual: "VISUAL MODE",
+          operator: "OPERATOR-PENDING",
+          textObject: "TEXT OBJECTS",
+          go: "GO COMMANDS (g...)",
+          zoom: "ZOOM COMMANDS (z...)",
+          indent: "INDENT COMMANDS (>...)",
+          outdent: "OUTDENT COMMANDS (<...)",
+        };
+
+        let keymapContent = "";
+        for (const [mode, bindings] of Object.entries(KeyMap)) {
+          const label = modeLabels[mode] || mode.toUpperCase();
+          // Deduplicate: group keys that share the same action
+          const actionMap = {};
+          for (const [key, { action, description }] of Object.entries(
+            bindings,
+          )) {
+            if (!actionMap[action]) {
+              actionMap[action] = { keys: [], description };
+            }
+            actionMap[action].keys.push(key);
+          }
+          keymapContent += `\n  <span style="color: ${COLORSCHEME.mode.normal.bg}; font-weight: bold;">${label}</span>\n`;
+          for (const { keys, description } of Object.values(actionMap)) {
+            const keyStr = keys.join("/");
+            keymapContent += `    ${keyStr.padEnd(10)} ${description}\n`;
+          }
+        }
+
         const cmdList = Object.entries(this.commands)
-          .map(([name, cmd]) => `  :${name.padEnd(12)} ${cmd.description}`)
+          .map(([name, cmd]) => `    :${name.padEnd(9)} ${cmd.description}`)
           .join("\n");
 
         helpEl.innerHTML = `
           <div style="margin-bottom: 16px; font-size: 16px; font-weight: bold; color: ${COLORSCHEME.mode.normal.bg};">
-            VimDocs Commands
+            VimDocs Help
           </div>
-          <pre style="margin: 0; color: #ccc;">${cmdList}</pre>
+          <div style="max-height: 70vh; overflow-y: auto;">
+            <pre style="margin: 0; color: #ccc;">${keymapContent}
+  <span style="color: ${COLORSCHEME.mode.normal.bg}; font-weight: bold;">COMMANDS</span>
+${cmdList}</pre>
+          </div>
           <div style="margin-top: 16px; color: #666; font-size: 12px;">
-            Press Escape or Enter to close
+            Press Escape, Enter, or q to close
           </div>
         `;
         helpEl.style.display = "block";
         helpEl.focus();
 
-        // Close on Escape or Enter
+        const scrollContainer = helpEl.querySelector(
+          "div[style*='overflow-y']",
+        );
         const closeHelp = (e) => {
-          if (e.key === "Escape" || e.key === "Enter") {
+          if (e.key === "Escape" || e.key === "Enter" || e.key === "q") {
             e.preventDefault();
             helpEl.style.display = "none";
             helpEl.removeEventListener("keydown", closeHelp);
             GoogleDocs.restoreFocus(() => Mode.toNormal());
+          } else if (e.key === "j" && scrollContainer) {
+            e.preventDefault();
+            scrollContainer.scrollTop += 40;
+          } else if (e.key === "k" && scrollContainer) {
+            e.preventDefault();
+            scrollContainer.scrollTop -= 40;
           }
         };
         helpEl.addEventListener("keydown", closeHelp);
@@ -1109,25 +1347,18 @@
        * @param {string} key - The key pressed after `>`.
        */
       indent(key) {
-        switch (key) {
-          case ">":
-            // Indent current line
+        const action = KeyMap.indent[key]?.action;
+        switch (action) {
+          case "indent":
             Keys.send("bracketRight", { control: true });
             break;
-          case "*":
-          case "-":
-          case "l":
-            // Bullet list (Ctrl+Shift+8)
+          case "bulletList":
             Keys.send("eight", { control: true, shift: true });
             break;
-          case "n":
-            // Numbered list (Ctrl+Shift+7)
+          case "numberedList":
             Keys.send("seven", { control: true, shift: true });
             break;
-          case "[":
-          case "]":
-          case "t":
-            // Checklist (Ctrl+Shift+9)
+          case "checklist":
             Keys.send("nine", { control: true, shift: true });
             break;
         }
@@ -1139,23 +1370,18 @@
        * @param {string} key - The key pressed after `<`.
        */
       outdent(key) {
-        switch (key) {
-          case "<":
-            // Outdent current line
+        const action = KeyMap.outdent[key]?.action;
+        switch (action) {
+          case "outdent":
             Keys.send("bracketLeft", { control: true });
             break;
-          case "*":
-          case "-":
-            // Toggle off bullet list (Ctrl+Shift+8)
+          case "bulletList":
             Keys.send("eight", { control: true, shift: true });
             break;
-          case "n":
-            // Toggle off numbered list (Ctrl+Shift+7)
+          case "numberedList":
             Keys.send("seven", { control: true, shift: true });
             break;
-          case "[":
-          case "]":
-            // Toggle off checklist (Ctrl+Shift+9)
+          case "checklist":
             Keys.send("nine", { control: true, shift: true });
             break;
         }
@@ -1253,29 +1479,28 @@
         const selected = getSelectedText();
         const isLine = Operate.isLinewise || Mode.current === "v-line";
         switch (operation) {
-          case "c":
+          case "change":
             if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.cut);
             Mode.toInsert();
             break;
-          case "d":
+          case "delete":
             if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.cut);
             Mode.toNormal(true);
             break;
-          case "y":
+          case "yank":
             if (selected) Register.save(selected, isLine ? "line" : "char");
             Menu.click(Menu.items.copy);
             Keys.send("left");
             Mode.toNormal(true);
             break;
-          case "p":
-            // Keys.send("v", Keys.clipboardMods());
+          case "pasteAfter":
             Mode.toNormal(true);
             break;
-          case "v":
+          case "visual":
             break;
-          case "g":
+          case "goPrefix":
             Move.toTop();
             break;
         }
@@ -1294,48 +1519,45 @@
           Operate.motion_count = nextCount;
           return;
         }
+
+        // Self-repeat: dd, yy, cc — the key's action matches the pending operator
+        const keyAction = KeyMap.normal[key]?.action;
+        if (keyAction === Operate.pending) {
+          const repeat = Operate.getRepeatCount();
+          Move.toStartOfLine();
+          Operate.isLinewise = true;
+          for (let i = 0; i < repeat; i++) {
+            Keys.send("down", { shift: true });
+          }
+          Operate.run();
+          return;
+        }
+
         const repeat = Operate.getRepeatCount();
-        switch (key) {
-          case "i":
+        const action = KeyMap.operator[key]?.action;
+        switch (action) {
+          case "inner":
             Operate.pending_text_object = "i";
             Mode.set("waitForTextObject");
             break;
-          case "a":
+          case "around":
             Operate.pending_text_object = "a";
             Mode.set("waitForTextObject");
             break;
-          case "w":
+          case "word":
             for (let i = 0; i < repeat; i++) Select.toEndOfWord();
             Operate.run();
             break;
-          case "p":
+          case "paragraph":
             for (let i = 0; i < repeat; i++) Select.toEndOfPara();
             Operate.run();
             break;
-          case "^":
-          case "_":
-          case "0":
+          case "lineStart":
             Select.toStartOfLine();
             Operate.run();
             break;
-          case "$":
+          case "lineEnd":
             Select.toEndOfLine();
-            Operate.run();
-            break;
-          case Operate.pending:
-            Move.toStartOfLine();
-            if (
-              Operate.pending === "d" ||
-              Operate.pending === "y" ||
-              Operate.pending === "c"
-            ) {
-              Operate.isLinewise = true;
-              for (let i = 0; i < repeat; i++) {
-                Keys.send("down", { shift: true });
-              }
-            } else {
-              Select.toEndOfLine();
-            }
             Operate.run();
             break;
           default:
@@ -1349,12 +1571,13 @@
        * @param {string} key - The key pressed.
        */
       waitForSecondInput(key) {
-        switch (key) {
-          case "w":
+        const action = KeyMap.textObject[key]?.action;
+        switch (action) {
+          case "word":
             Move.toStartOfWord();
             Operate.waitForFirstInput(key);
             break;
-          case "p":
+          case "paragraph":
             Move.toStartOfPara();
             Operate.waitForFirstInput(key);
             break;
@@ -1370,13 +1593,14 @@
        */
       waitForTextObject(key) {
         const repeat = Operate.getRepeatCount();
-        switch (key) {
-          case "w":
+        const action = KeyMap.textObject[key]?.action;
+        switch (action) {
+          case "word":
             Select.innerWord();
             Operate.pending_text_object = "";
             Operate.run();
             break;
-          case "p":
+          case "paragraph":
             if (repeat > 0) {
               if (Operate.pending_text_object === "a") {
                 Select.aroundPara();
@@ -1405,13 +1629,14 @@
        * @param {string} key - The text object key.
        */
       waitForVisualInput(key) {
-        switch (key) {
-          case "w":
+        const action = KeyMap.textObject[key]?.action;
+        switch (action) {
+          case "word":
             Keys.send("left", { control: true });
             Move.toStartOfWord();
             Select.toEndOfWord();
             break;
-          case "p":
+          case "paragraph":
             if (Operate.pending_text_object === "a") {
               Select.aroundPara();
             } else {
@@ -1478,11 +1703,14 @@
           Vim._repeat.times = Number(String(Vim._repeat.times) + key);
           return;
         }
+        const countAction = KeyMap.normal[key]?.action;
         if (
           Vim._repeat.mode === "normal" &&
-          (key === "c" || key === "d" || key === "y")
+          (countAction === "change" ||
+            countAction === "delete" ||
+            countAction === "yank")
         ) {
-          Operate.pending = key;
+          Operate.pending = countAction;
           Operate.operator_count = Vim._repeat.times;
           Operate.motion_count = 0;
           Mode.set("waitForFirstInput");
@@ -1627,17 +1855,15 @@
        * @param {string} key - The key pressed after `z`.
        */
       handleZoom(key) {
-        switch (key) {
-          case "-":
-            // Zoom out (Ctrl + -)
+        const action = KeyMap.zoom[key]?.action;
+        switch (action) {
+          case "zoomOut":
             Keys.send("minus", { control: true });
             break;
-          case "=":
-            // Zoom in (Ctrl + =)
+          case "zoomIn":
             Keys.send("equal", { control: true });
             break;
-          case "z":
-            // Reset zoom to 100% (Ctrl + 0)
+          case "zoomReset":
             Keys.send("zero", { control: true });
             break;
         }
@@ -1649,48 +1875,38 @@
        * @param {string} key - The key pressed after `g`.
        */
       handleGo(key) {
-        switch (key) {
-          case "g":
-            // Go to top of document (gg)
+        const action = KeyMap.go[key]?.action;
+        switch (action) {
+          case "goTop":
             Move.toTop();
             break;
-          case "u":
-            // Lowercase selection (gu)
+          case "lowercase":
             Menu.searchAndRun("Lowercase");
             break;
-          case "U":
-            // Uppercase selection (gU)
+          case "uppercase":
             Menu.searchAndRun("Uppercase");
             break;
-          case "f":
-            // Follow link at cursor (Alt + Enter)
+          case "followLink":
             Keys.send("enter", { alt: true });
             break;
-          case "m":
-          case "/":
-            // Open menu search (Alt + /)
+          case "menuSearch":
             Keys.send("slash", { alt: true });
             break;
-          case "h":
-            // Go to next heading (Ctrl+Alt+N, then Ctrl+Alt+H)
+          case "nextHeading":
             Keys.send("n", { control: true, alt: true });
             setTimeout(() => Keys.send("h", { control: true, alt: true }), 10);
             break;
-          case "H":
-            // Go to previous heading (Ctrl+Alt+P, then Ctrl+Alt+H)
+          case "prevHeading":
             Keys.send("p", { control: true, alt: true });
             setTimeout(() => Keys.send("h", { control: true, alt: true }), 10);
             break;
-          case "?":
-            // Show help
+          case "showHelp":
             Command.showHelp();
             break;
-          case "T":
-            // Go to previous tab (Ctrl+Shift+PgUp)
+          case "prevTab":
             Keys.send("pageup", { control: true, shift: true });
             break;
-          case "t":
-            // Go to next tab (Ctrl+Shift+PgDown)
+          case "nextTab":
             Keys.send("pagedown", { control: true, shift: true });
             break;
         }
@@ -1719,71 +1935,73 @@
           return;
         }
 
+        const action = KeyMap.normal[key]?.action;
+
         // Cancel search if key isn't the cycling key for that search type
         if (Find.is_active) {
-          const isCharCycleKey =
+          const isCharCycleAction =
             Find.is_char_search &&
-            (key === "f" ||
-              key === "F" ||
-              key === "t" ||
-              key === "T" ||
-              key === ";" ||
-              key === ",");
-          const isSlashCycleKey =
-            !Find.is_char_search && (key === "n" || key === "N");
-          if (!isCharCycleKey && !isSlashCycleKey) {
+            [
+              "findForward",
+              "findBackward",
+              "tillForward",
+              "tillBackward",
+              "repeatFind",
+              "repeatFindBack",
+            ].includes(action);
+          const isSlashCycleAction =
+            !Find.is_char_search &&
+            (action === "searchNext" || action === "searchPrev");
+          if (!isCharCycleAction && !isSlashCycleAction) {
             Find.cancelSearch();
           }
         }
 
-        switch (key) {
-          case "h":
+        switch (action) {
+          case "moveLeft":
             Keys.send("left");
             break;
-          case "j":
+          case "moveDown":
             Keys.send("down");
             break;
-          case "k":
+          case "moveUp":
             Keys.send("up");
             break;
-          case "l":
+          case "moveRight":
             Keys.send("right");
             break;
-          case "}":
+          case "paraForward":
             Move.toEndOfPara();
             break;
-          case "{":
+          case "paraBack":
             Move.toStartOfPara();
             break;
-          case "b":
-          case "B":
+          case "wordBack":
             Move.toStartOfWord();
             break;
-          case "e":
-          case "E":
+          case "wordEnd":
             Move.toEndOfWord();
             break;
-          case "w":
-          case "W":
+          case "wordForward":
             Move.toEndOfWord();
             Move.toEndOfWord();
             Move.toStartOfWord();
             break;
-          case "g":
+          case "goPrefix":
             Mode.set("waitForGo");
             return;
-          case "G":
+          case "goBottom":
             Keys.send("end", { control: true });
             break;
-          case "c":
-          case "d":
-          case "y":
-            Operate.pending = key;
+          case "change":
+          case "delete":
+          case "yank":
+            Operate.pending = action;
             Operate.operator_count = 1;
             Operate.motion_count = 0;
             Mode.set("waitForFirstInput");
             break;
-          case "p":
+          case "pasteAfter":
             if (Register.text) {
               if (Register.type === "line") {
                 Move.toEndOfLine();
@@ -1794,7 +2012,7 @@
               }
             }
             break;
-          case "P":
+          case "pasteBefore":
             if (Register.text) {
               if (Register.type === "line") {
                 Move.toStartOfLine();
@@ -1805,29 +2023,27 @@
               }
             }
             break;
-          case "a":
+          case "append":
             Edit.append();
             break;
-          case "A":
+          case "appendLine":
             Move.toEndOfLine();
             Mode.toInsert();
             break;
-          case "i":
+          case "insert":
             Mode.toInsert();
             break;
-          case "I":
+          case "insertLine":
             Move.toStartOfLine();
             Mode.toInsert();
             break;
-          case "^":
-          case "_":
-          case "0":
+          case "lineStart":
             Move.toStartOfLine();
             break;
-          case "$":
+          case "lineEnd":
             Move.toEndOfLine();
             break;
-          case "C": {
+          case "changeToEnd": {
             Select.toEndOfLine();
             const selection = getSelectedText();
             if (selection) Register.save(selection);
@@ -1835,36 +2051,36 @@
             Mode.toInsert();
             break;
           }
-          case "D": {
+          case "deleteToEnd": {
             Select.toEndOfLine();
             const selection = getSelectedText();
             if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             break;
           }
-          case "v":
+          case "visual":
             Mode.toVisual();
             break;
-          case "V":
+          case "visualLine":
             Mode.toVisualLine();
             break;
-          case "o":
+          case "openBelow":
             Edit.addLineBottom();
             break;
-          case "O":
+          case "openAbove":
             Edit.addLineTop();
             break;
-          case "u":
+          case "undo":
             Menu.click(Menu.items.undo);
             break;
-          case "r":
+          case "replaceChar":
             Mode.replace_char = true;
             Mode.toInsert();
             break;
-          case "R":
+          case "replaceMode":
             Mode.toReplace();
             break;
-          case "f":
+          case "findForward":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
             } else {
@@ -1873,7 +2089,7 @@
               Mode.set("waitForFindChar");
             }
             return;
-          case "F":
+          case "findBackward":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: Find.is_forward });
             } else {
@@ -1882,7 +2098,7 @@
               Mode.set("waitForFindChar");
             }
             return;
-          case "t":
+          case "tillForward":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
             } else {
@@ -1891,7 +2107,7 @@
               Mode.set("waitForFindChar");
             }
             return;
-          case "T":
+          case "tillBackward":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
             } else {
@@ -1900,70 +2116,69 @@
               Mode.set("waitForFindChar");
             }
             return;
-          case ";":
+          case "repeatFind":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
             }
             return;
-          case ",":
+          case "repeatFindBack":
             if (Find.is_active && Find.is_char_search) {
               Keys.send("g", { control: true, shift: Find.is_forward });
             }
             return;
-          case "/":
+          case "searchForward":
             Find.handleSlashSearch(true);
             return;
-          case "?":
+          case "searchBackward":
             Find.handleSlashSearch(false);
             return;
-          case "*":
+          case "searchWordForward":
             Find.handleStarSearch(true);
             return;
-          case "#":
+          case "searchWordBackward":
             Find.handleStarSearch(false);
             return;
-          case "n":
+          case "searchNext":
             if (Find.is_active && !Find.is_char_search) {
               Keys.send("g", { control: true, shift: !Find.is_forward });
             } else if (!Find.is_active && Find.last_search) {
               Find.handleSlashSearch(true, Find.last_search);
             }
             return;
-          case "N":
+          case "searchPrev":
             if (Find.is_active && !Find.is_char_search) {
               Keys.send("g", { control: true, shift: Find.is_forward });
             } else if (!Find.is_active && Find.last_search) {
               Find.handleSlashSearch(false, Find.last_search);
             }
             return;
-          case "x": {
+          case "deleteChar": {
             Keys.send("right", { shift: true });
             const selection = getSelectedText();
             if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             break;
           }
-          case ".":
-            // Repeat last action (redo)
+          case "repeat":
             Keys.send("y", { control: true });
             break;
-          case ">":
+          case "indentPrefix":
             Mode.set("waitForIndent");
             return;
-          case "<":
+          case "outdentPrefix":
             Mode.set("waitForOutdent");
             return;
-          case "z":
+          case "zoomPrefix":
             Mode.set("waitForZoom");
             return;
-          case ":":
+          case "commandMode":
             Mode.set("command");
             Command.open();
             return;
-          case "Enter":
+          case "enterKey":
             if (Find.is_active) Find.closeFindWindow();
             return;
-          case "Backspace":
+          case "backspace":
             Keys.send("left");
             break;
           default:
@@ -1993,28 +2208,27 @@
           Vim._repeat.times = Number(key);
           return;
         }
-        switch (key) {
-          case "":
-            break;
-          case "g":
+        const action = KeyMap.visual[key]?.action;
+        switch (action) {
+          case "goPrefix":
             Vim.from_visual = true;
             Mode.set("waitForGo");
             return;
-          case "h":
+          case "selectLeft":
             Mode.visual_direction = "left";
             Keys.send("left", { shift: true });
             break;
-          case "j":
+          case "selectDown":
             Keys.send("down", { shift: true });
             break;
-          case "k":
+          case "selectUp":
             Keys.send("up", { shift: true });
             break;
-          case "l":
+          case "selectRight":
             Mode.visual_direction = "right";
             Keys.send("right", { shift: true });
             break;
-          case "p": {
+          case "replaceWithRegister": {
             const selected = getSelectedText();
             if (Register.text) {
               insertText(Register.text);
@@ -2023,57 +2237,56 @@
             Mode.toNormal(true);
             break;
           }
-          case "}":
+          case "selectParaForward":
             Move.toEndOfPara(true);
             break;
-          case "{":
+          case "selectParaBack":
             Move.toStartOfPara(true);
             break;
-          case "b":
+          case "selectWordBack":
             Select.toStartOfWord();
             break;
-          case "e":
-          case "w":
+          case "selectWordEnd":
             Select.toEndOfWord();
             break;
-          case "^":
-          case "_":
-          case "0":
+          case "selectLineStart":
             Select.toStartOfLine();
             break;
-          case "$":
+          case "selectLineEnd":
             Select.toEndOfLine();
             break;
-          case "G":
+          case "selectToBottom":
             Keys.send("end", { control: true, shift: true });
             break;
-          case "g":
-            Keys.send("home", { control: true, shift: true });
+          case "change":
+            Operate.run("change");
             break;
-          case "c":
-          case "d":
-          case "y":
-            Operate.run(key);
+          case "delete":
+            Operate.run("delete");
             break;
-          case "i":
-          case "a":
-            Operate.pending_text_object = key;
+          case "yank":
+            Operate.run("yank");
+            break;
+          case "innerPrefix":
+            Operate.pending_text_object = "i";
             Mode.set("waitForVisualInput");
             break;
-          case "x": {
+          case "aroundPrefix":
+            Operate.pending_text_object = "a";
+            Mode.set("waitForVisualInput");
+            break;
+          case "deleteSelection": {
             const selection = getSelectedText();
             if (selection) Register.save(selection);
             Menu.click(Menu.items.cut);
             Mode.toNormal(true);
             break;
           }
-          case ">":
-            // Indent selection
+          case "indentSelection":
             Keys.send("bracketRight", { control: true });
             Mode.toNormal(true);
             break;
-          case "<":
-            // Outdent selection
+          case "outdentSelection":
             Keys.send("bracketLeft", { control: true });
             Mode.toNormal(true);
             break;
